@@ -3,12 +3,18 @@
 This is a library to work with i2c sensors like BME280, ENS160, TMP117 and similar.
 
 ```rust
+use i2c_sensors::ens160::{
+    Ens160DeviceAddress,
+    ENS160,
+};
+use std::path::Path;
+
 fn main() {
 
-    let bus_path = std::path::Path::new("/dev/i2c-0");
-    let device_addr = i2c_sensors::ens160::Ens160DeviceAddress::Default;
+    let bus_path = Path::new("/dev/i2c-0");
+    let device_addr = Ens160DeviceAddress::Default;
     
-    let mut ens160 = i2c_sensors::ens160::ENS160::new(bus_path, device_addr).expect("Failed to initialize ENS160");    
+    let mut ens160 = ENS160::new(bus_path, device_addr).expect("Failed to initialize ENS160");    
 
     let ens160_part_id = ens160.get_part_id();
     println!("ENS160 device id is {ens160_part_id:#06x}");
@@ -24,5 +30,6 @@ fn main() {
 
     let ens160_eco2 = ens160.get_equivalent_co2().expect("Failed to get equivalent CO2 from ENS160");
     println!("ENS160 Equivalent CO2 Concentration (ppm): {ens160_eco2}");
+    
 }
 ```
