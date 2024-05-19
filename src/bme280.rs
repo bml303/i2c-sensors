@@ -3,16 +3,16 @@ use i2c_linux::I2c;
 use log::{debug, info};
 use std::fmt;
 use std::fs::File;
+use std::path::Path;
 use std::{thread, time};
 
 use crate::i2cio;
 
 const BME280_CHIP_ID: u8 = 0x60;
-const BME280_DEV_ADDR: u16 = 0x77;
 const BME280_LEN_TEMP_PRESS_CALIB_DATA: usize = 26;
 const BME280_LEN_HUMIDITY_CALIB_DATA: usize = 7;
 const BME280_LEN_P_T_H_DATA: usize = 8;
-const BME280_STARTUP_DELAY_MS: u64 = 2000;
+const BME280_STARTUP_DELAY_MS: u64 = 2;
 const BME280_SOFT_RESET_COMMAND: u8 = 0xb6;
 const BME280_TEMPERATURE_MIN: f64 = -40.0;
 const BME280_TEMPERATURE_MAX: f64 = 85.0;
@@ -60,6 +60,30 @@ const BME280_REG_DATA: u8 = 0xf7;
 const BME280_12_BIT_SHIFT: u8 = 12;
 const BME280_8_BIT_SHIFT: u8 = 8;
 const BME280_4_BIT_SHIFT: u8 = 4;
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Bme280DeviceAddress {
+    Default,    
+    Secondary,    
+}
+
+impl Default for Bme280DeviceAddress {
+    fn default() -> Self {
+        Bme280DeviceAddress::Default
+    }
+}
+
+impl Bme280DeviceAddress {
+    const BME280_DEV_ADDR_DEFAULT: u16 = 0x77;
+    const BME280_DEV_ADDR_SECONDARY: u16 = 0x76;    
+
+    fn value(&self) -> u16 {
+        match *self {
+            Self::Default => Self::BME280_DEV_ADDR_DEFAULT,
+            Self::Secondary => Self::BME280_DEV_ADDR_SECONDARY,            
+        }
+    }
+}
 
 pub enum Bme280SensorMode {
     Bme280PowerModeSleep,
@@ -299,35 +323,48 @@ struct UncompData
 
 
 pub struct BME280 {
+    // -- i2c bus
+    i2c: I2c<File>,
+    // -- device address.
+    device_addr: Bme280DeviceAddress,
+    // -- calibration data
     calib_data: CalibData,
+    // -- uncompensated data
     uncomp_data: UncompData,
 }
 
 impl BME280 {
 
-    pub fn new(i2c: &mut I2c<File>) -> Result<BME280, std::io::Error> {
-        Self::set_slave(i2c)?;
-        let chip_id = i2cio::read_byte(i2c, BME280_REG_PART_ID)?;
+    pub fn new(i2c_bus_path: &Path, device_addr: Bme280DeviceAddress) -> Result<BME280, std::io::Error> {
+        // -- get the bus
+        let mut i2c = i2cio::get_bus(i2c_bus_path)?;
+        // -- set device address
+        i2cio::set_slave(&mut i2c, device_addr.value())?;  
+        // -- check if device is available by reading chip id
+        let chip_id = i2cio::read_byte(&mut i2c, BME280_REG_PART_ID)?;
         if chip_id != BME280_CHIP_ID {
             let errmsg = format!("Found unknown chip id '{chip_id:#04x}', expected '{BME280_CHIP_ID:#04x}'");
             return Err(std::io::Error::new(std::io::ErrorKind::Other, errmsg))
         }
         debug!("Got chip id: {chip_id:#x}");
-        // -- initiate soft reset
-        Self::soft_reset(i2c)?;
+        // -- do a soft reset since it's in an unknown state
+        Self::soft_reset(&mut i2c)?;
         // -- get calibration data
-        let calib_data = Self::get_calib_data(i2c)?;
+        let calib_data = Self::get_calib_data(&mut i2c)?;
         // -- return initialized structure
         Ok(BME280 {
+            i2c,
+            device_addr,
             calib_data,
             uncomp_data: Default::default(),
         })
     }
 
-    pub fn set_slave(i2c: &mut I2c<File>) -> Result<(), std::io::Error> {
-        i2cio::set_slave(i2c, BME280_DEV_ADDR)
+    #[allow(dead_code)]
+    pub fn get_device_addr(&self) -> Bme280DeviceAddress {
+        self.device_addr.clone()
     }
-
+    
     fn soft_reset(i2c: &mut I2c<File>) -> Result<(), std::io::Error> {
         // -- initiate soft reset
         debug!("Initiating soft reset");
@@ -383,49 +420,49 @@ impl BME280 {
 
     }
 
-    pub fn set_osr_humidity(&self, i2c: &mut I2c<File>, osr_h: Bme280OverSampling) -> Result<(), std::io::Error> {
+    pub fn set_osr_humidity(&mut self, osr_h: Bme280OverSampling) -> Result<(), std::io::Error> {
         // -- write oversampling to ctr_hum
         let ctrl_hum = osr_h.value();
         debug!("Setting register BME280_REG_CTRL_HUM {BME280_REG_CTRL_HUM:#x} to value {ctrl_hum:#010b}");
-        i2cio::write_byte(i2c, BME280_REG_CTRL_HUM, ctrl_hum)?;
+        i2cio::write_byte(&mut self.i2c, BME280_REG_CTRL_HUM, ctrl_hum)?;
         // -- changes to ctrl_hum will be only effective after a write operation to ctrl_meas register
         // -- read current value of ctrl_meas...
-        let ctrl_meas = i2cio::read_byte(i2c, BME280_REG_CTRL_MEAS)?;
+        let ctrl_meas = i2cio::read_byte(&mut self.i2c, BME280_REG_CTRL_MEAS)?;
         // -- ...and write it back
-        i2cio::write_byte(i2c, BME280_REG_CTRL_MEAS, ctrl_meas)
+        i2cio::write_byte(&mut self.i2c, BME280_REG_CTRL_MEAS, ctrl_meas)
     }
 
-    pub fn set_osr_pressure_temperature(&self, i2c: &mut I2c<File>, osr_p : Bme280OverSampling, osr_t : Bme280OverSampling) -> Result<(), std::io::Error> {
+    pub fn set_osr_pressure_temperature(&mut self, osr_p : Bme280OverSampling, osr_t : Bme280OverSampling) -> Result<(), std::io::Error> {
         // -- read current value of ctrl_meas...
-        let ctrl_meas = i2cio::read_byte(i2c, BME280_REG_CTRL_MEAS)?;
+        let ctrl_meas = i2cio::read_byte(&mut self.i2c, BME280_REG_CTRL_MEAS)?;
         // -- ...keep mode bits, set pressure osr bits and temp osr bits...
         let ctrl_meas = (ctrl_meas & BME280_CTRL_MODE_MSK) | (osr_p.value() << BME280_CTRL_PRESS_POS) | (osr_t.value() << BME280_CTRL_TEMP_POS);
         debug!("Setting register BME280_REG_CTRL_MEAS {BME280_REG_CTRL_MEAS:#x} to value {ctrl_meas:#010b}");
         // -- ...and write it back
-        i2cio::write_byte(i2c, BME280_REG_CTRL_MEAS, ctrl_meas)
+        i2cio::write_byte(&mut self.i2c, BME280_REG_CTRL_MEAS, ctrl_meas)
     }
 
-    pub fn set_sensor_config(&self, i2c: &mut I2c<File>, t_standby: Bme280TimeStandby, irr_filter: Bme280IrrFilter, spi3w_en: Bme280Spi3w) -> Result<(), std::io::Error> {
+    pub fn set_sensor_config(&mut self, t_standby: Bme280TimeStandby, irr_filter: Bme280IrrFilter, spi3w_en: Bme280Spi3w) -> Result<(), std::io::Error> {
         // -- set t_sb, filter bits, and spi3w_en bit
         let ctrl_config = (t_standby.value() << BME280_T_STANDBY_POS) | (irr_filter.value() << BME280_IRR_FILTER_POS) | spi3w_en.value();
         debug!("Setting register BME280_REG_CONFIG {BME280_REG_CONFIG:#x} to value {ctrl_config:#010b}");
         // -- write it back
-        i2cio::write_byte(i2c, BME280_REG_CONFIG, ctrl_config)
+        i2cio::write_byte(&mut self.i2c, BME280_REG_CONFIG, ctrl_config)
     }
 
-    pub fn set_sensor_mode(&self, i2c: &mut I2c<File>, sensor_mode : Bme280SensorMode) -> Result<(), std::io::Error> {
+    pub fn set_sensor_mode(&mut self, sensor_mode : Bme280SensorMode) -> Result<(), std::io::Error> {
         // -- read current value of ctrl_meas...
-        let ctrl_meas = i2cio::read_byte(i2c, BME280_REG_CTRL_MEAS)?;
+        let ctrl_meas = i2cio::read_byte(&mut self.i2c, BME280_REG_CTRL_MEAS)?;
         // -- ...keep pressure osr bits and temp osr bits, set mode bits...
         let ctrl_meas = (ctrl_meas & (BME280_CTRL_PRESS_MSK | BME280_CTRL_TEMP_MSK) ) | sensor_mode.value();
         debug!("Setting register BME280_REG_CTRL_MEAS {BME280_REG_CTRL_MEAS:#x} to value {ctrl_meas:#010b}");
         // -- ...and write it back
-        i2cio::write_byte(i2c, BME280_REG_CTRL_MEAS, ctrl_meas)
+        i2cio::write_byte(&mut self.i2c, BME280_REG_CTRL_MEAS, ctrl_meas)
     }
 
-    pub fn get_sensor_mode(&self, i2c: &mut I2c<File>) -> Result<Bme280SensorMode, std::io::Error> {
+    pub fn get_sensor_mode(&mut self) -> Result<Bme280SensorMode, std::io::Error> {
         // -- read current value of ctrl_meas...
-        let ctrl_meas = i2cio::read_byte(i2c, BME280_REG_CTRL_MEAS)?;
+        let ctrl_meas = i2cio::read_byte(&mut self.i2c, BME280_REG_CTRL_MEAS)?;
         let sensor_mode = match ctrl_meas & BME280_CTRL_MODE_MSK {
             0 => Bme280SensorMode::Bme280PowerModeSleep,
             1..=2 => Bme280SensorMode::Bme280PowerModeForced,
@@ -434,17 +471,17 @@ impl BME280 {
         Ok(sensor_mode)
     }
 
-    pub fn is_measuring(&self, i2c: &mut I2c<File>) -> Result<bool, std::io::Error> {
+    pub fn is_measuring(&mut self) -> Result<bool, std::io::Error> {
         // -- get temperature and pressure calibration data
-        let status = i2cio::read_byte(i2c, BME280_REG_STATUS)?;
+        let status = i2cio::read_byte(&mut self.i2c, BME280_REG_STATUS)?;
         let is_measuring = (status & BME280_STATUS_MEASURING) > 0;
         Ok(is_measuring)
     }
 
-    pub fn get_sensor_data(&mut self, i2c: &mut I2c<File>, ) -> Result<(), std::io::Error> {
+    pub fn get_sensor_data(&mut self) -> Result<(), std::io::Error> {
         // -- get temperature and pressure calibration data
         let mut reg_data: [u8; BME280_LEN_P_T_H_DATA] = [0; BME280_LEN_P_T_H_DATA];
-        let _bytes_read = i2c.i2c_read_block_data(BME280_REG_DATA, &mut reg_data)?;
+        let _bytes_read = self.i2c.i2c_read_block_data(BME280_REG_DATA, &mut reg_data)?;
         debug!("Read {_bytes_read} bytes sensor data");
 
         /* Store the parsed register values for pressure data */
