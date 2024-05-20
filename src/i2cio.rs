@@ -25,6 +25,10 @@ pub fn read_byte(i2c: &mut I2c<File>, register: u8) -> Result<u8, std::io::Error
     i2c.smbus_read_byte_data(register)
 }
 
+pub fn write_byte_single(i2c: &mut I2c<File>, data: u8) -> Result<(), std::io::Error> {
+    i2c.smbus_write_byte(data)
+}
+
 pub fn write_byte(i2c: &mut I2c<File>, register: u8, data: u8) -> Result<(), std::io::Error> {
     i2c.smbus_write_byte_data(register, data)
 }
