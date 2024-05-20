@@ -233,15 +233,29 @@ impl HT16K33 {
     //     self.i2c.smbus_write_block_data(0, &self.display_ram)
     // }
 
-    pub fn print(&mut self, msg: String, ) -> Result<(), std::io::Error> {
+    pub fn print(&mut self, msg: String, set_colon: bool, set_dot: bool) -> Result<(), std::io::Error> {
         let segments = Self::get_segments(msg);
         self.display_ram = [0; 16];
+        if set_colon {
+            self.set_colon()
+        }
+        if set_dot {
+            self.set_dot()
+        }
         self.illuminate_char(segments[0], 0);
         self.illuminate_char(segments[1], 1);
         self.illuminate_char(segments[2], 2);
         self.illuminate_char(segments[3], 3);        
         self.i2c.smbus_write_block_data(0, &self.display_ram)
     }    
+
+    fn set_colon(&mut self) {
+        self.display_ram[0] |= 1;
+    }
+
+    fn set_dot(&mut self) {
+        self.display_ram[2] |= 1;
+    }
 
     fn illuminate_char(&mut self, segs_turn_on: u16, digit: u8) {
         // -- digit cannot be bigger than 4
