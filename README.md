@@ -38,3 +38,9 @@ fn main() {
 
 }
 ```
+
+Run the example for SHT31
+
+```shell
+cargo run --example sht31-example /dev/i2c-0 single
+```
