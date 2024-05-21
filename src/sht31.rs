@@ -177,8 +177,8 @@ impl SHT31 {
         debug!("Stopping SHT31 continuous mode");
         sht31.stop_continuous_mode()?;
         // -- do a soft reset since it's in an unknown state
-        debug!("Soft-resetting SHT31");
-        sht31.soft_reset()?;
+        // debug!("Soft-resetting SHT31");
+        // sht31.soft_reset()?;
         // -- ready to measure steady
         Ok(sht31)
     }
