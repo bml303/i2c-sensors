@@ -1,4 +1,5 @@
 pub mod bme280;
+pub mod bme388;
 pub mod ens160;
 pub mod ht16k33;
 #[allow(dead_code)]

@@ -98,9 +98,9 @@ impl Bme280SensorMode {
 
     fn value(&self) -> u8 {
         match *self {
-            Bme280SensorMode::Bme280PowerModeSleep => Self::BME280_POWERMODE_SLEEP,
-            Bme280SensorMode::Bme280PowerModeForced => Self::BME280_POWERMODE_FORCED,
-            Bme280SensorMode::Bme280PowerModeNormal => Self::BME280_POWERMODE_NORMAL,
+            Self::Bme280PowerModeSleep => Self::BME280_POWERMODE_SLEEP,
+            Self::Bme280PowerModeForced => Self::BME280_POWERMODE_FORCED,
+            Self::Bme280PowerModeNormal => Self::BME280_POWERMODE_NORMAL,
         }
     }
 }
@@ -109,9 +109,9 @@ impl fmt::Display for Bme280SensorMode {
     // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Bme280SensorMode::Bme280PowerModeSleep => write!(f, "Bme280PowerModeSleep"),
-            Bme280SensorMode::Bme280PowerModeForced => write!(f, "Bme280PowerModeForced"),
-            Bme280SensorMode::Bme280PowerModeNormal => write!(f, "Bme280PowerModeNormal"),
+            Self::Bme280PowerModeSleep => write!(f, "Bme280PowerModeSleep/{:#04x}", self.value()),
+            Self::Bme280PowerModeForced => write!(f, "Bme280PowerModeForced/{:#04x}", self.value()),
+            Self::Bme280PowerModeNormal => write!(f, "Bme280PowerModeNormal/{:#04x}", self.value()),
         }
     }
 }
@@ -137,13 +137,13 @@ impl Bme280OverSampling {
 
     fn value(&self) -> u8 {
         match *self {
-            Bme280OverSampling::NoOversampling => Self::BME280_NO_OVERSAMPLING,
-            Bme280OverSampling::Oversampling1x => Self::BME280_OVERSAMPLING_1X,
-            Bme280OverSampling::Oversampling2x => Self::BME280_OVERSAMPLING_2X,
-            Bme280OverSampling::Oversampling4x => Self::BME280_OVERSAMPLING_4X,
-            Bme280OverSampling::Oversampling8x => Self::BME280_OVERSAMPLING_8X,
-            Bme280OverSampling::Oversampling16x => Self::BME280_OVERSAMPLING_16X,
-            Bme280OverSampling::OversamplingMax => Self::BME280_OVERSAMPLING_MAX,
+            Self::NoOversampling => Self::BME280_NO_OVERSAMPLING,
+            Self::Oversampling1x => Self::BME280_OVERSAMPLING_1X,
+            Self::Oversampling2x => Self::BME280_OVERSAMPLING_2X,
+            Self::Oversampling4x => Self::BME280_OVERSAMPLING_4X,
+            Self::Oversampling8x => Self::BME280_OVERSAMPLING_8X,
+            Self::Oversampling16x => Self::BME280_OVERSAMPLING_16X,
+            Self::OversamplingMax => Self::BME280_OVERSAMPLING_MAX,
         }
     }
 }
@@ -152,13 +152,13 @@ impl fmt::Display for Bme280OverSampling {
     // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Bme280OverSampling::NoOversampling => write!(f, "NoOversampling"),
-            Bme280OverSampling::Oversampling1x => write!(f, "Oversampling1x"),
-            Bme280OverSampling::Oversampling2x => write!(f, "Oversampling2x"),
-            Bme280OverSampling::Oversampling4x => write!(f, "Oversampling4x"),
-            Bme280OverSampling::Oversampling8x => write!(f, "Oversampling8x"),
-            Bme280OverSampling::Oversampling16x => write!(f, "Oversampling16x"),
-            Bme280OverSampling::OversamplingMax => write!(f, "OversamplingMax"),
+            Self::NoOversampling => write!(f, "NoOversampling/{:#04x}", self.value()),
+            Self::Oversampling1x => write!(f, "Oversampling1x/{:#04x}", self.value()),
+            Self::Oversampling2x => write!(f, "Oversampling2x/{:#04x}", self.value()),
+            Self::Oversampling4x => write!(f, "Oversampling4x/{:#04x}", self.value()),
+            Self::Oversampling8x => write!(f, "Oversampling8x/{:#04x}", self.value()),
+            Self::Oversampling16x => write!(f, "Oversampling16x/{:#04x}", self.value()),
+            Self::OversamplingMax => write!(f, "OversamplingMax/{:#04x}", self.value()),
         }
     }
 }
@@ -186,14 +186,14 @@ impl Bme280TimeStandby {
 
     fn value(&self) -> u8 {
         match *self {
-            Bme280TimeStandby::Ms0_5 => Self::BME280_STANDBY_TIME_0_5_MS,
-            Bme280TimeStandby::Ms10 => Self::BME280_STANDBY_TIME_10_MS,
-            Bme280TimeStandby::Ms20 => Self::BME280_STANDBY_TIME_20_MS,
-            Bme280TimeStandby::Ms62_5 => Self::BME280_STANDBY_TIME_62_5_MS,
-            Bme280TimeStandby::Ms125 => Self::BME280_STANDBY_TIME_125_MS,
-            Bme280TimeStandby::Ms250 => Self::BME280_STANDBY_TIME_250_MS,
-            Bme280TimeStandby::Ms500 => Self::BME280_STANDBY_TIME_500_MS,
-            Bme280TimeStandby::Ms1000 => Self::BME280_STANDBY_TIME_1000_MS,
+            Self::Ms0_5 => Self::BME280_STANDBY_TIME_0_5_MS,
+            Self::Ms10 => Self::BME280_STANDBY_TIME_10_MS,
+            Self::Ms20 => Self::BME280_STANDBY_TIME_20_MS,
+            Self::Ms62_5 => Self::BME280_STANDBY_TIME_62_5_MS,
+            Self::Ms125 => Self::BME280_STANDBY_TIME_125_MS,
+            Self::Ms250 => Self::BME280_STANDBY_TIME_250_MS,
+            Self::Ms500 => Self::BME280_STANDBY_TIME_500_MS,
+            Self::Ms1000 => Self::BME280_STANDBY_TIME_1000_MS,
         }
     }
 }
@@ -202,14 +202,14 @@ impl fmt::Display for Bme280TimeStandby {
     // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {            
-            Bme280TimeStandby::Ms0_5 => write!(f, "Ms0_5"),
-            Bme280TimeStandby::Ms10 => write!(f, "Ms10"),
-            Bme280TimeStandby::Ms20 => write!(f, "Ms20"),
-            Bme280TimeStandby::Ms62_5 => write!(f, "Ms62_5"),
-            Bme280TimeStandby::Ms125 => write!(f, "Ms125"),
-            Bme280TimeStandby::Ms250 => write!(f, "Ms250"),
-            Bme280TimeStandby::Ms500 => write!(f, "Ms500"),
-            Bme280TimeStandby::Ms1000 => write!(f, "Ms1000"),
+            Self::Ms0_5 => write!(f, "Ms0_5/{:#04x}", self.value()),
+            Self::Ms10 => write!(f, "Ms10/{:#04x}", self.value()),
+            Self::Ms20 => write!(f, "Ms20/{:#04x}", self.value()),
+            Self::Ms62_5 => write!(f, "Ms62_5/{:#04x}", self.value()),
+            Self::Ms125 => write!(f, "Ms125/{:#04x}", self.value()),
+            Self::Ms250 => write!(f, "Ms250/{:#04x}", self.value()),
+            Self::Ms500 => write!(f, "Ms500/{:#04x}", self.value()),
+            Self::Ms1000 => write!(f, "Ms1000/{:#04x}", self.value()),
         }
     }
 }
@@ -232,11 +232,11 @@ impl Bme280IrrFilter {
 
     fn value(&self) -> u8 {
         match *self {
-            Bme280IrrFilter::FilterOff => Self::BME280_FILTER_COEFF_OFF,
-            Bme280IrrFilter::Filter2x => Self::BME280_FILTER_COEFF_2,
-            Bme280IrrFilter::Filter4x => Self::BME280_FILTER_COEFF_4,
-            Bme280IrrFilter::Filter8x => Self::BME280_FILTER_COEFF_8,
-            Bme280IrrFilter::Filter16x => Self::BME280_FILTER_COEFF_16,
+            Self::FilterOff => Self::BME280_FILTER_COEFF_OFF,
+            Self::Filter2x => Self::BME280_FILTER_COEFF_2,
+            Self::Filter4x => Self::BME280_FILTER_COEFF_4,
+            Self::Filter8x => Self::BME280_FILTER_COEFF_8,
+            Self::Filter16x => Self::BME280_FILTER_COEFF_16,
         }
     }
 }
@@ -245,11 +245,11 @@ impl fmt::Display for Bme280IrrFilter {
     // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {                        
-            Bme280IrrFilter::FilterOff => write!(f, "FilterOff"),
-            Bme280IrrFilter::Filter2x => write!(f, "Filter2x"),
-            Bme280IrrFilter::Filter4x => write!(f, "Filter4x"),
-            Bme280IrrFilter::Filter8x => write!(f, "Filter8x"),
-            Bme280IrrFilter::Filter16x => write!(f, "Filter16x"),
+            Self::FilterOff => write!(f, "FilterOff/{:#04x}", self.value()),
+            Self::Filter2x => write!(f, "Filter2x/{:#04x}", self.value()),
+            Self::Filter4x => write!(f, "Filter4x/{:#04x}", self.value()),
+            Self::Filter8x => write!(f, "Filter8x/{:#04x}", self.value()),
+            Self::Filter16x => write!(f, "Filter16x/{:#04x}", self.value()),
         }
     }
 }
@@ -265,8 +265,8 @@ impl Bme280Spi3w {
 
     fn value(&self) -> u8 {
         match *self {
-            Bme280Spi3w::Disable => Self::BME280_SPI3W_DISABLE,
-            Bme280Spi3w::Enable => Self::BME280_SPI3W_ENABLE,
+            Self::Disable => Self::BME280_SPI3W_DISABLE,
+            Self::Enable => Self::BME280_SPI3W_ENABLE,
         }
     }
 }
@@ -275,8 +275,8 @@ impl fmt::Display for Bme280Spi3w {
     // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {                                    
-            Bme280Spi3w::Disable => write!(f, "Disable"),
-            Bme280Spi3w::Enable => write!(f, "Enable"),
+            Self::Disable => write!(f, "Disable/{:#04x}", self.value()),
+            Self::Enable => write!(f, "Enable/{:#04x}", self.value()),
         }
     }
 }
