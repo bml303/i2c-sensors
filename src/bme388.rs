@@ -530,27 +530,38 @@ impl BME388 {
 
         // -- pressure calibration coefficients
         let par_p1 = Self::concat_bytes(reg_data[6], reg_data[5]) as i16;        
-        let par_p1 = (par_p1 - 16384) as f64 / 1048576.0;
+        //let par_p1 = (par_p1 - 16384) as f64 / 1048576.0;
+        let par_p1 = (par_p1 - 16384) as f64 * 0.000000953674316;
         let par_p2 = Self::concat_bytes(reg_data[8], reg_data[7]) as i16;        
-        let par_p2 = (par_p2 - 16384) as f64 / 536870912.0;
+        //let par_p2 = (par_p2 - 16384) as f64 / 536870912.0;
+        let par_p2 = (par_p2 - 16384) as f64 * 0.000000001862645;
         let par_p3 = reg_data[9] as i8;        
-        let par_p3 = par_p3 as f64 / 4294967296.0;
+        //let par_p3 = par_p3 as f64 / 4294967296.0;
+        let par_p3 = par_p3 as f64 * 0.000000000232831;
         let par_p4 = reg_data[10] as i8;        
-        let par_p4 = (par_p4 as f64) / 137438953472.0;
+        //let par_p4 = (par_p4 as f64) / 137438953472.0;
+        let par_p4 = (par_p4 as f64) * 0.000000000007276;
         let par_p5 = Self::concat_bytes(reg_data[12], reg_data[11]);
-        let par_p5 = (par_p5 as f64) / 0.125;
+        //let par_p5 = (par_p5 as f64) / 0.125;
+        let par_p5 = (par_p5 as f64) * 8.0;
         let par_p6 = Self::concat_bytes(reg_data[14], reg_data[13]);        
-        let par_p6 = (par_p6 as f64) / 64.0;
+        //let par_p6 = (par_p6 as f64) / 64.0;
+        let par_p6 = (par_p6 as f64) * 0.015625;
         let par_p7 = reg_data[15] as i8;        
-        let par_p7 = (par_p7 as f64) / 256.0;
+        //let par_p7 = (par_p7 as f64) / 256.0;
+        let par_p7 = (par_p7 as f64) * 0.00390625;
         let par_p8 = reg_data[16] as i8;        
-        let par_p8 = (par_p8 as f64) / 32768.0;
+        //let par_p8 = (par_p8 as f64) / 32768.0;
+        let par_p8 = (par_p8 as f64) * 0.000030517578125;
         let par_p9 = Self::concat_bytes(reg_data[18], reg_data[17]) as i16;        
-        let par_p9 = (par_p9 as f64) / 281474976710656.0;
+        //let par_p9 = (par_p9 as f64) / 281474976710656.0;
+        let par_p9 = (par_p9 as f64) * 0.000000000000004;
         let par_p10 = reg_data[19] as i8;
-        let par_p10 = (par_p10 as f64) / 281474976710656.0;
+        //let par_p10 = (par_p10 as f64) / 281474976710656.0;
+        let par_p10 = (par_p10 as f64) * 0.000000000000004;
         let par_p11 = reg_data[20] as i8;
-        let par_p11 = (par_p11 as f64) / 36893488147419103232.0;
+        //let par_p11 = (par_p11 as f64) / 36893488147419103232.0;        
+        let par_p11 = (par_p11 as f64) * 0.00000000000000000002710505431213761;
 
         // -- create calibration structure
         let calib_data = CalibData {
