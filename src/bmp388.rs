@@ -9,60 +9,60 @@ use std::{thread, time};
 use crate::i2cio;
 
 // -- chip id
-const BME388_CHIP_ID: u8 = 0x50;
+const BMP388_CHIP_ID: u8 = 0x50;
 
 // -- length of multi-byte registers
-const BME388_LEN_TRIMMING_COEFFICIENTS: usize = 21;
-const BME388_LEN_PRESSURE_DATA: usize = 3;
-const BME388_LEN_TEMPERATURE_DATA: usize = 3;
+const BMP388_LEN_TRIMMING_COEFFICIENTS: usize = 21;
+const BMP388_LEN_PRESSURE_DATA: usize = 3;
+const BMP388_LEN_TEMPERATURE_DATA: usize = 3;
 #[allow(dead_code)]
-const BME388_LEN_SENSOR_TIME: usize = 3;
+const BMP388_LEN_SENSOR_TIME: usize = 3;
 #[allow(dead_code)]
-const BME388_LEN_FIFO_LENGTH: usize = 2;
+const BMP388_LEN_FIFO_LENGTH: usize = 2;
 #[allow(dead_code)]
-const BME388_LEN_FIFO_WATERMARK: usize = 2;
+const BMP388_LEN_FIFO_WATERMARK: usize = 2;
 
 // -- registers
-const BME388_REG_CHIP_ID: u8 = 0x00;
+const BMP388_REG_CHIP_ID: u8 = 0x00;
 #[allow(dead_code)]
-const BME388_REG_ERRORS: u8 = 0x02;
-const BME388_REG_STATUS: u8 = 0x03;
-const BME388_REG_PRESSURE_DATA: u8 = 0x04;
-const BME388_REG_TEMPERATURE_DATA: u8 = 0x07;
+const BMP388_REG_ERRORS: u8 = 0x02;
+const BMP388_REG_STATUS: u8 = 0x03;
+const BMP388_REG_PRESSURE_DATA: u8 = 0x04;
+const BMP388_REG_TEMPERATURE_DATA: u8 = 0x07;
 #[allow(dead_code)]
-const BME388_REG_SENSOR_TIME: u8 = 0x0C;
+const BMP388_REG_SENSOR_TIME: u8 = 0x0C;
 #[allow(dead_code)]
-const BME388_REG_EVENT: u8 = 0x10;
+const BMP388_REG_EVENT: u8 = 0x10;
 #[allow(dead_code)]
-const BME388_REG_INT_STATUS: u8 = 0x11;
+const BMP388_REG_INT_STATUS: u8 = 0x11;
 #[allow(dead_code)]
-const BME388_REG_FIFO_LENGTH: u8 = 0x12;
+const BMP388_REG_FIFO_LENGTH: u8 = 0x12;
 #[allow(dead_code)]
-const BME388_REG_FIFO_DATA: u8 = 0x14;
+const BMP388_REG_FIFO_DATA: u8 = 0x14;
 #[allow(dead_code)]
-const BME388_REG_FIFO_WATERMARK: u8 = 0x15;
+const BMP388_REG_FIFO_WATERMARK: u8 = 0x15;
 #[allow(dead_code)]
-const BME388_REG_FIFO_CONFIG_1: u8 = 0x17;
+const BMP388_REG_FIFO_CONFIG_1: u8 = 0x17;
 #[allow(dead_code)]
-const BME388_REG_FIFO_CONFIG_2: u8 = 0x18;
+const BMP388_REG_FIFO_CONFIG_2: u8 = 0x18;
 #[allow(dead_code)]
-const BME388_REG_INT_CONTROL: u8 = 0x19;
+const BMP388_REG_INT_CONTROL: u8 = 0x19;
 #[allow(dead_code)]
-const BME388_REG_IF_CONF: u8 = 0x1a;
-const BME388_REG_POWER_CONTROL: u8 = 0x1b;
-const BME388_REG_OVERSAMPLING_RATE: u8 = 0x1c;
-const BME388_REG_OUTPUT_DATA_RATE: u8 = 0x1d;
-const BME388_REG_CONFIG: u8 = 0x1f;
-const BME388_REG_TRIMMING_COEFFICIENTS: u8 = 0x31;
-const BME388_REG_CMD: u8 = 0x7e;
+const BMP388_REG_IF_CONF: u8 = 0x1a;
+const BMP388_REG_POWER_CONTROL: u8 = 0x1b;
+const BMP388_REG_OVERSAMPLING_RATE: u8 = 0x1c;
+const BMP388_REG_OUTPUT_DATA_RATE: u8 = 0x1d;
+const BMP388_REG_CONFIG: u8 = 0x1f;
+const BMP388_REG_TRIMMING_COEFFICIENTS: u8 = 0x31;
+const BMP388_REG_CMD: u8 = 0x7e;
 
 // -- commands
 #[allow(dead_code)]
-const BME388_CMD_FIFO_FLUSH: u8 = 0xb0;
-const BME388_CMD_SOFT_RESET: u8 = 0xb6;
+const BMP388_CMD_FIFO_FLUSH: u8 = 0xb0;
+const BMP388_CMD_SOFT_RESET: u8 = 0xb6;
 
 // -- other constants
-const BME388_STARTUP_DELAY_MS: u64 = 2;
+const BMP388_STARTUP_DELAY_MS: u64 = 2;
 
 const BME280_PRESSURE_SENSOR_ENABLED_BIT: u8 = 0x1;
 const BME280_TEMPERATURE_SENSOR_ENABLED_BIT: u8 = 0x2;
@@ -73,18 +73,18 @@ const BME280_STATUS_PRESSURE_DATA_READY_MASK: u8 = 0x20;
 const BME280_STATUS_TEMPERATURE_DATA_READY_MASK: u8 = 0x40;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum BME388DeviceAddress {
+pub enum BMP388DeviceAddress {
     Default,
     Secondary,
 }
 
-impl Default for BME388DeviceAddress {
+impl Default for BMP388DeviceAddress {
     fn default() -> Self {
-        BME388DeviceAddress::Default
+        BMP388DeviceAddress::Default
     }
 }
 
-impl BME388DeviceAddress {
+impl BMP388DeviceAddress {
     const ADDR_DEFAULT: u16 = 0x77;
     const ADDR_SECONDARY: u16 = 0x76;
 
@@ -97,13 +97,13 @@ impl BME388DeviceAddress {
 }
 
 #[derive(PartialEq)]
-pub enum BME388SensorPowerMode {
+pub enum BMP388SensorPowerMode {
     Sleep,
     Forced,
     Normal
 }
 
-impl BME388SensorPowerMode {
+impl BMP388SensorPowerMode {
     const POWERMODE_SLEEP: u8 = 0x00;
     const POWERMODE_FORCED: u8 = 0x01;
     const POWERMODE_NORMAL: u8 = 0x03;
@@ -117,7 +117,7 @@ impl BME388SensorPowerMode {
     }
 }
 
-impl fmt::Display for BME388SensorPowerMode {
+impl fmt::Display for BMP388SensorPowerMode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Self::Sleep => write!(f, "Sleep/{:#04x}", self.value()),
@@ -128,12 +128,12 @@ impl fmt::Display for BME388SensorPowerMode {
 }
 
 #[derive(PartialEq)]
-pub enum BME388StatusPressureSensor {
+pub enum BMP388StatusPressureSensor {
     Disabled,
     Enabled,
 }
 
-impl BME388StatusPressureSensor {
+impl BMP388StatusPressureSensor {
     fn value(&self) -> u8 {
         match *self {
             Self::Disabled => 0,
@@ -142,7 +142,7 @@ impl BME388StatusPressureSensor {
     }
 }
 
-impl fmt::Display for BME388StatusPressureSensor {
+impl fmt::Display for BMP388StatusPressureSensor {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Self::Disabled => write!(f, "Disabled/{}", self.value()),
@@ -152,12 +152,12 @@ impl fmt::Display for BME388StatusPressureSensor {
 }
 
 #[derive(PartialEq)]
-pub enum BME388StatusTemperatureSensor {
+pub enum BMP388StatusTemperatureSensor {
     Disabled,
     Enabled,
 }
 
-impl BME388StatusTemperatureSensor {
+impl BMP388StatusTemperatureSensor {
     fn value(&self) -> u8 {
         match *self {
             Self::Disabled => 0,
@@ -166,7 +166,7 @@ impl BME388StatusTemperatureSensor {
     }
 }
 
-impl fmt::Display for BME388StatusTemperatureSensor {
+impl fmt::Display for BMP388StatusTemperatureSensor {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Self::Disabled => write!(f, "Disabled/{}", self.value()),
@@ -176,12 +176,12 @@ impl fmt::Display for BME388StatusTemperatureSensor {
 }
 
 #[allow(dead_code)]
-pub enum BME388OverSamplingPr {
+pub enum BMP388OverSamplingPr {
     UltraLowX1, LowX2, StandardX4,
     HighX8, UltraHighX16, HighestX32,
 }
 
-impl BME388OverSamplingPr {
+impl BMP388OverSamplingPr {
     const OSR_X1_ULTRA_LOW: u8 = 0x00;
     const OSR_X2_LOW: u8 = 0x01;
     const OSR_X4_STANDARD: u8 = 0x02;
@@ -201,7 +201,7 @@ impl BME388OverSamplingPr {
     }
 }
 
-impl fmt::Display for BME388OverSamplingPr {
+impl fmt::Display for BMP388OverSamplingPr {
     // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -215,11 +215,11 @@ impl fmt::Display for BME388OverSamplingPr {
     }
 }
 
-pub enum BME388OverSamplingTp {
+pub enum BMP388OverSamplingTp {
     X1, X2, X4, X8, X16, X32,
 }
 
-impl BME388OverSamplingTp {
+impl BMP388OverSamplingTp {
     const OSR_X1: u8 = 0x00;
     const OSR_X2: u8 = 0x01;
     const OSR_X4: u8 = 0x02;
@@ -239,7 +239,7 @@ impl BME388OverSamplingTp {
     }
 }
 
-impl fmt::Display for BME388OverSamplingTp {
+impl fmt::Display for BMP388OverSamplingTp {
     // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -253,14 +253,14 @@ impl fmt::Display for BME388OverSamplingTp {
     }
 }
 
-pub enum BME388OutputDataRate {
+pub enum BMP388OutputDataRate {
     Odr200, Odr100, Odr50, Odr25, Odr12p5, 
     Odr6p25, Odr3p1, Odr1p5, Odr0p78, Odr0p39, 
     Odr0p2, Odr0p1, Odr0p05, Odr0p02, Odr0p01,
     Odr0p006, Odr0p003, Odr0p0015,
 }
 
-impl BME388OutputDataRate {
+impl BMP388OutputDataRate {
     fn value(&self) -> u8 {
         match *self {
             Self::Odr200 => 0x00,
@@ -285,11 +285,11 @@ impl BME388OutputDataRate {
     }
 }
 
-pub enum BME388IrrFilter {
+pub enum BMP388IrrFilter {
     Off, Coef1, Coef3, Coef7, Coef15, Coef31, Coef63, Coef127,
 }
 
-impl BME388IrrFilter {
+impl BMP388IrrFilter {
     const COEF_0: u8 = 0x00;
     const COEF_1: u8 = 0x01;
     const COEF_3: u8 = 0x02;
@@ -314,12 +314,12 @@ impl BME388IrrFilter {
 }
 
 #[derive(PartialEq)]
-pub enum BME388StatusCommandDecoder {
+pub enum BMP388StatusCommandDecoder {
     NotReady,
     Ready
 }
 
-impl fmt::Display for BME388StatusCommandDecoder {
+impl fmt::Display for BMP388StatusCommandDecoder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Self::NotReady => write!(f, "Command decoder not ready"),
@@ -329,12 +329,12 @@ impl fmt::Display for BME388StatusCommandDecoder {
 }
 
 #[derive(PartialEq)]
-pub enum BME388StatusPressureData {
+pub enum BMP388StatusPressureData {
     NotReady,
     Ready
 }
 
-impl fmt::Display for BME388StatusPressureData {
+impl fmt::Display for BMP388StatusPressureData {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Self::NotReady => write!(f, "Pressure data not ready"),
@@ -344,12 +344,12 @@ impl fmt::Display for BME388StatusPressureData {
 }
 
 #[derive(PartialEq)]
-pub enum BME388StatusTemperatureData {
+pub enum BMP388StatusTemperatureData {
     NotReady,
     Ready
 }
 
-impl fmt::Display for BME388StatusTemperatureData {
+impl fmt::Display for BMP388StatusTemperatureData {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Self::NotReady => write!(f, "Temperature data not ready"),
@@ -389,30 +389,30 @@ pub struct RawData
 }
 
 
-pub struct BME388 {
+pub struct BMP388 {
     // -- i2c bus
     i2c: I2c<File>,
     // -- device address.
-    device_addr: BME388DeviceAddress,
+    device_addr: BMP388DeviceAddress,
     // -- calibration data
     calib_data: CalibData,
     // -- uncompensated data
     raw_data: RawData,    
 }
 
-impl BME388 {
+impl BMP388 {
 
-    pub fn new(i2c_bus_path: &Path, device_addr: BME388DeviceAddress, 
-        osr_p: BME388OverSamplingPr, osr_t: BME388OverSamplingTp, 
-        irr_filter: BME388IrrFilter, odr: BME388OutputDataRate) -> Result<BME388, std::io::Error> {
+    pub fn new(i2c_bus_path: &Path, device_addr: BMP388DeviceAddress, 
+        osr_p: BMP388OverSamplingPr, osr_t: BMP388OverSamplingTp, 
+        irr_filter: BMP388IrrFilter, odr: BMP388OutputDataRate) -> Result<BMP388, std::io::Error> {
         // -- get the bus
         let mut i2c = i2cio::get_bus(i2c_bus_path)?;
         // -- set device address
         i2cio::set_slave(&mut i2c, device_addr.value())?;
         // -- check if device is available by reading chip id
-        let chip_id = i2cio::read_byte(&mut i2c, BME388_REG_CHIP_ID)?;
-        if chip_id != BME388_CHIP_ID {
-            let errmsg = format!("Found unknown chip id '{chip_id:#04x}', expected '{BME388_CHIP_ID:#04x}'");
+        let chip_id = i2cio::read_byte(&mut i2c, BMP388_REG_CHIP_ID)?;
+        if chip_id != BMP388_CHIP_ID {
+            let errmsg = format!("Found unknown chip id '{chip_id:#04x}', expected '{BMP388_CHIP_ID:#04x}'");
             return Err(std::io::Error::new(std::io::ErrorKind::Other, errmsg))
         }
         debug!("Got chip id: {chip_id:#x}");
@@ -421,90 +421,90 @@ impl BME388 {
         // -- get calibration data
         let calib_data = Self::get_calib_data(&mut i2c)?;
         // -- return initialized structure
-        let mut bme388 = BME388 {
+        let mut bmp388 = BMP388 {
             i2c,
             device_addr,
             calib_data,
             raw_data: Default::default(),
         };
-        bme388.set_osr_pressure_temperature(osr_p, osr_t)?;
-        bme388.set_irr_filter(irr_filter)?;
-        bme388.set_output_data_rate(odr)?;
-        Ok(bme388)
+        bmp388.set_osr_pressure_temperature(osr_p, osr_t)?;
+        bmp388.set_irr_filter(irr_filter)?;
+        bmp388.set_output_data_rate(odr)?;
+        Ok(bmp388)
     }
 
     #[allow(dead_code)]
-    pub fn get_device_addr(&self) -> BME388DeviceAddress {
+    pub fn get_device_addr(&self) -> BMP388DeviceAddress {
         self.device_addr.clone()
     }
 
     fn soft_reset(i2c: &mut I2c<File>) -> Result<(), std::io::Error> {
         // -- initiate soft reset
         debug!("Initiating soft reset");
-        i2cio::write_byte(i2c, BME388_REG_CMD, BME388_CMD_SOFT_RESET)?;
+        i2cio::write_byte(i2c, BMP388_REG_CMD, BMP388_CMD_SOFT_RESET)?;
         // -- wait for the device to startup
-        let startup_delay = time::Duration::from_millis(BME388_STARTUP_DELAY_MS);
+        let startup_delay = time::Duration::from_millis(BMP388_STARTUP_DELAY_MS);
         thread::sleep(startup_delay);
         Ok(())
     }
 
-    pub fn set_output_data_rate(&mut self, subdiv_factor: BME388OutputDataRate) -> Result<(), std::io::Error> {
+    pub fn set_output_data_rate(&mut self, subdiv_factor: BMP388OutputDataRate) -> Result<(), std::io::Error> {
         let reg_val = subdiv_factor.value();
-        debug!("Setting register BME388_REG_OUTPUT_DATA_RATE {BME388_REG_OUTPUT_DATA_RATE:#x} to value {reg_val:#010b}");
+        debug!("Setting register BMP388_REG_OUTPUT_DATA_RATE {BMP388_REG_OUTPUT_DATA_RATE:#x} to value {reg_val:#010b}");
         // -- write it back
-        i2cio::write_byte(&mut self.i2c, BME388_REG_OUTPUT_DATA_RATE, reg_val)
+        i2cio::write_byte(&mut self.i2c, BMP388_REG_OUTPUT_DATA_RATE, reg_val)
     }
 
-    pub fn set_irr_filter(&mut self, irr_filter: BME388IrrFilter) -> Result<(), std::io::Error> {
+    pub fn set_irr_filter(&mut self, irr_filter: BMP388IrrFilter) -> Result<(), std::io::Error> {
         let reg_val = irr_filter.value();
-        debug!("Setting register BME388_REG_CONFIG {BME388_REG_CONFIG:#x} to value {reg_val:#010b}");
+        debug!("Setting register BMP388_REG_CONFIG {BMP388_REG_CONFIG:#x} to value {reg_val:#010b}");
         // -- write it back
-        i2cio::write_byte(&mut self.i2c, BME388_REG_CONFIG, reg_val)
+        i2cio::write_byte(&mut self.i2c, BMP388_REG_CONFIG, reg_val)
     }
 
-    pub fn set_sensor_mode(&mut self, pwr_mode : BME388SensorPowerMode, 
-        enable_pressure: BME388StatusPressureSensor, enable_temperature: BME388StatusTemperatureSensor) -> Result<(), std::io::Error> {
+    pub fn set_sensor_mode(&mut self, pwr_mode : BMP388SensorPowerMode, 
+        enable_pressure: BMP388StatusPressureSensor, enable_temperature: BMP388StatusTemperatureSensor) -> Result<(), std::io::Error> {
         let reg_val = pwr_mode.value() << BME280_POWER_MODE_LOW_BIT | enable_temperature.value() << 1 | enable_pressure.value();
-        debug!("Setting register BME388_REG_POWER_CONTROL {BME388_REG_POWER_CONTROL:#x} to value {reg_val:#010b}");
+        debug!("Setting register BMP388_REG_POWER_CONTROL {BMP388_REG_POWER_CONTROL:#x} to value {reg_val:#010b}");
         // -- write it back
-        i2cio::write_byte(&mut self.i2c, BME388_REG_POWER_CONTROL, reg_val)
+        i2cio::write_byte(&mut self.i2c, BMP388_REG_POWER_CONTROL, reg_val)
     }
 
-    pub fn get_sensor_mode(&mut self) -> Result<(BME388SensorPowerMode, BME388StatusPressureSensor, BME388StatusTemperatureSensor), std::io::Error> {
-        // -- read current value of BME388_REG_POWER_CONTROL
-        let reg_val = i2cio::read_byte(&mut self.i2c, BME388_REG_POWER_CONTROL)?;
-        debug!("Got register BME388_REG_POWER_CONTROL {BME388_REG_POWER_CONTROL:#x} value {reg_val:#010b}");
+    pub fn get_sensor_mode(&mut self) -> Result<(BMP388SensorPowerMode, BMP388StatusPressureSensor, BMP388StatusTemperatureSensor), std::io::Error> {
+        // -- read current value of BMP388_REG_POWER_CONTROL
+        let reg_val = i2cio::read_byte(&mut self.i2c, BMP388_REG_POWER_CONTROL)?;
+        debug!("Got register BMP388_REG_POWER_CONTROL {BMP388_REG_POWER_CONTROL:#x} value {reg_val:#010b}");
         let pressure_enabled = match (reg_val & BME280_PRESSURE_SENSOR_ENABLED_BIT) > 0 {
-            false => BME388StatusPressureSensor::Disabled,
-            true => BME388StatusPressureSensor::Enabled,
+            false => BMP388StatusPressureSensor::Disabled,
+            true => BMP388StatusPressureSensor::Enabled,
         };
         let temperature_enabled = match (reg_val & BME280_TEMPERATURE_SENSOR_ENABLED_BIT) > 0 {
-            false => BME388StatusTemperatureSensor::Disabled,
-            true => BME388StatusTemperatureSensor::Enabled,  
+            false => BMP388StatusTemperatureSensor::Disabled,
+            true => BMP388StatusTemperatureSensor::Enabled,  
         };
         let sensor_mode = match reg_val >> BME280_POWER_MODE_LOW_BIT {
-            0 => BME388SensorPowerMode::Sleep,
-            1..=2 => BME388SensorPowerMode::Forced,
-            _ => BME388SensorPowerMode::Normal,
+            0 => BMP388SensorPowerMode::Sleep,
+            1..=2 => BMP388SensorPowerMode::Forced,
+            _ => BMP388SensorPowerMode::Normal,
         };
         Ok((sensor_mode, pressure_enabled, temperature_enabled))
     }
 
     pub fn get_status(&mut self) 
-        -> Result<(BME388StatusCommandDecoder, BME388StatusPressureData, BME388StatusTemperatureData), std::io::Error> {
-        // -- read current value of BME388_REG_POWER_CONTROL
-        let reg_val = i2cio::read_byte(&mut self.i2c, BME388_REG_STATUS)?;
+        -> Result<(BMP388StatusCommandDecoder, BMP388StatusPressureData, BMP388StatusTemperatureData), std::io::Error> {
+        // -- read current value of BMP388_REG_POWER_CONTROL
+        let reg_val = i2cio::read_byte(&mut self.i2c, BMP388_REG_STATUS)?;
         let cmd_decoder_ready = match (reg_val & BME280_STATUS_CMD_READY_MASK) > 0 {
-            false => BME388StatusCommandDecoder::NotReady,
-            true => BME388StatusCommandDecoder::Ready,
+            false => BMP388StatusCommandDecoder::NotReady,
+            true => BMP388StatusCommandDecoder::Ready,
         };
         let pressure_data_ready = match (reg_val & BME280_STATUS_PRESSURE_DATA_READY_MASK) > 0 {
-            false => BME388StatusPressureData::NotReady,
-            true => BME388StatusPressureData::Ready,
+            false => BMP388StatusPressureData::NotReady,
+            true => BMP388StatusPressureData::Ready,
         };
         let temperature_data_ready = match (reg_val & BME280_STATUS_TEMPERATURE_DATA_READY_MASK) > 0 {
-            false => BME388StatusTemperatureData::NotReady,
-            true => BME388StatusTemperatureData::Ready,
+            false => BMP388StatusTemperatureData::NotReady,
+            true => BMP388StatusTemperatureData::Ready,
         };
         Ok((cmd_decoder_ready, pressure_data_ready, temperature_data_ready))
     }
@@ -515,8 +515,8 @@ impl BME388 {
 
     fn get_calib_data(i2c: &mut I2c<File>) -> Result<CalibData, std::io::Error> {
         // -- get temperature and pressure calibration data
-        let mut reg_data: [u8; BME388_LEN_TRIMMING_COEFFICIENTS] = [0; BME388_LEN_TRIMMING_COEFFICIENTS];
-        let _bytes_read = i2c.i2c_read_block_data(BME388_REG_TRIMMING_COEFFICIENTS, &mut reg_data)?;
+        let mut reg_data: [u8; BMP388_LEN_TRIMMING_COEFFICIENTS] = [0; BMP388_LEN_TRIMMING_COEFFICIENTS];
+        let _bytes_read = i2c.i2c_read_block_data(BMP388_REG_TRIMMING_COEFFICIENTS, &mut reg_data)?;
         // -- temperature calibration coefficients
         let par_t1 = Self::concat_bytes(reg_data[1], reg_data[0]);
         // let par_t1 = par_t1 as f64 / 0.00390625;  
@@ -576,9 +576,9 @@ impl BME388 {
 
     pub fn get_data_raw(&mut self) -> Result<(), std::io::Error> {
         // -- get temperature and pressure data
-        const DATA_LEN: usize = BME388_LEN_PRESSURE_DATA + BME388_LEN_TEMPERATURE_DATA;
+        const DATA_LEN: usize = BMP388_LEN_PRESSURE_DATA + BMP388_LEN_TEMPERATURE_DATA;
         let mut reg_data: [u8; DATA_LEN] = [0; DATA_LEN];
-        let _bytes_read = self.i2c.i2c_read_block_data(BME388_REG_PRESSURE_DATA, &mut reg_data)?;
+        let _bytes_read = self.i2c.i2c_read_block_data(BMP388_REG_PRESSURE_DATA, &mut reg_data)?;
         debug!("Got {_bytes_read} bytes of raw data");
         let data_xlsb = reg_data[0] as u32;
         let data_lsb = (reg_data[1] as u32) << 8;
@@ -600,8 +600,8 @@ impl BME388 {
 
     pub fn get_pressure_raw(&mut self) -> Result<u32, std::io::Error> {
         // -- get temperature and pressure data
-        let mut reg_data: [u8; BME388_LEN_PRESSURE_DATA] = [0; BME388_LEN_PRESSURE_DATA];
-        let _bytes_read = self.i2c.i2c_read_block_data(BME388_REG_PRESSURE_DATA, &mut reg_data)?;
+        let mut reg_data: [u8; BMP388_LEN_PRESSURE_DATA] = [0; BMP388_LEN_PRESSURE_DATA];
+        let _bytes_read = self.i2c.i2c_read_block_data(BMP388_REG_PRESSURE_DATA, &mut reg_data)?;
         let pressure = (reg_data[2] as u32) << 16 | (reg_data[1] as u32) << 8 | (reg_data[0] as u32);
         debug!("Got raw pressure: {pressure}");
         Ok(pressure)
@@ -609,18 +609,18 @@ impl BME388 {
 
     pub fn get_temperature_raw(&mut self) -> Result<u32, std::io::Error> {
         // -- get temperature and pressure data
-        let mut reg_data: [u8; BME388_LEN_TEMPERATURE_DATA] = [0; BME388_LEN_TEMPERATURE_DATA];
-        let _bytes_read = self.i2c.i2c_read_block_data(BME388_REG_TEMPERATURE_DATA, &mut reg_data)?;
+        let mut reg_data: [u8; BMP388_LEN_TEMPERATURE_DATA] = [0; BMP388_LEN_TEMPERATURE_DATA];
+        let _bytes_read = self.i2c.i2c_read_block_data(BMP388_REG_TEMPERATURE_DATA, &mut reg_data)?;
         let temperature = (reg_data[2] as u32) << 16 | (reg_data[1] as u32) << 8 | (reg_data[0] as u32);
         debug!("Got raw temperature: {temperature}");
         Ok(temperature)
     }
 
-    pub fn set_osr_pressure_temperature(&mut self, osr_p: BME388OverSamplingPr, osr_t : BME388OverSamplingTp) -> Result<(), std::io::Error> {
+    pub fn set_osr_pressure_temperature(&mut self, osr_p: BMP388OverSamplingPr, osr_t : BMP388OverSamplingTp) -> Result<(), std::io::Error> {
         // -- write oversampling for pressure and temperature
         let reg_val = osr_t.value() << 3 | osr_p.value();
-        debug!("Setting register BME388_REG_OVERSAMPLING_RATE {BME388_REG_OVERSAMPLING_RATE:#x} to value {reg_val:#010b} / {osr_p} for pressure, {osr_t} for temperature");
-        i2cio::write_byte(&mut self.i2c, BME388_REG_OVERSAMPLING_RATE, reg_val)
+        debug!("Setting register BMP388_REG_OVERSAMPLING_RATE {BMP388_REG_OVERSAMPLING_RATE:#x} to value {reg_val:#010b} / {osr_p} for pressure, {osr_t} for temperature");
+        i2cio::write_byte(&mut self.i2c, BMP388_REG_OVERSAMPLING_RATE, reg_val)
     }
 
     pub fn get_temperature(&self) -> f64 {    
