@@ -73,9 +73,39 @@ const BME280_STATUS_CMD_READY_MASK: u8 = 0x10;
 const BME280_STATUS_PRESSURE_DATA_READY_MASK: u8 = 0x20;
 const BME280_STATUS_TEMPERATURE_DATA_READY_MASK: u8 = 0x40;
 
+// -- int status
+const BME280_INT_STATUS_DATA_READY_BIT: u8 = 0x08;
+
+// -- fifo config 1
+const BME280_FIFO_DISABLE_FIFO: u8 = 0x00;
+const BME280_FIFO_STOP_ON_FULL_BIT: u8 = 1;
+const BME280_FIFO_TIME_ENABLE_BIT: u8 = 2;
+const BME280_FIFO_PRESSURE_ENABLE_BIT: u8 = 3;
+const BME280_FIFO_TEMPERATURE_ENABLE_BIT: u8 = 4;
+// -- fifo config 2
+const BME280_FIFO_DATA_SELECT_BIT: u8 = 3;
+
+// -- fifo frame
+const BME280_FIFO_SENSOR_FRAME_BIT: u8 = 0x80;
+const BME280_FIFO_CONTROL_FRAME_BIT: u8 = 0x40;
+const BME280_FIFO_CONTROL_FRAME_CONFIG_ERROR_BIT: u8 = 0x04;
+const BME280_FIFO_CONTROL_FRAME_CONFIG_CHANGE_BIT: u8 = 0x08;
+const BME280_FIFO_SENSOR_FRAME_TIME_BIT: u8 = 0x20;
+const BME280_FIFO_SENSOR_FRAME_TEMPERATURE_BIT: u8 = 0x10;
+const BME280_FIFO_SENSOR_FRAME_PRESSURE_BIT: u8 = 0x04;
+
+//const BME280_FIFO_FRAME_LENGTH: u8 = 16;
+
 #[derive(Debug)]
-struct CalibData
-{
+pub struct FifoData {
+    pub pressure_raw: Option<u32>,
+    pub temperature_raw: Option<u32>,
+    pub sensor_time: Option<u32>,
+    pub config_change: bool,
+}
+
+#[derive(Debug)]
+struct CalibData {
     // -- Calibration coefficients for the pressure sensor
     par_p1: f64,
     par_p2: f64,
@@ -91,12 +121,11 @@ struct CalibData
     // -- Calibration coefficients for the temperature sensor
     par_t1: f64,
     par_t2: f64,
-    par_t3: f64,    
+    par_t3: f64,
 }
 
 #[derive(Debug, Default)]
-pub struct RawData
-{
+pub struct RawData {
     // -- Un-compensated pressure
     pub pressure: u32,
     // -- Un-compensated temperature
@@ -112,13 +141,15 @@ pub struct BMP388 {
     // -- calibration data
     calib_data: CalibData,
     // -- uncompensated data
-    raw_data: RawData,    
+    raw_data: RawData,
+    // -- is sensor time enabled for FIFO data?
+    is_time_enabled: bool,
 }
 
 impl BMP388 {
 
-    pub fn new(i2c_bus_path: &Path, device_addr: BMP388DeviceAddress, 
-        osr_p: BMP388OverSamplingPr, osr_t: BMP388OverSamplingTp, 
+    pub fn new(i2c_bus_path: &Path, device_addr: BMP388DeviceAddress,
+        osr_p: BMP388OverSamplingPr, osr_t: BMP388OverSamplingTp,
         irr_filter: BMP388IrrFilter, odr: BMP388OutputDataRate) -> Result<BMP388, std::io::Error> {
         // -- get the bus
         let mut i2c = i2cio::get_bus(i2c_bus_path)?;
@@ -141,6 +172,7 @@ impl BMP388 {
             device_addr,
             calib_data,
             raw_data: Default::default(),
+            is_time_enabled: false,
         };
         bmp388.set_osr_pressure_temperature(osr_p, osr_t)?;
         bmp388.set_irr_filter(irr_filter)?;
@@ -177,7 +209,7 @@ impl BMP388 {
         i2cio::write_byte(&mut self.i2c, BMP388_REG_CONFIG, reg_val)
     }
 
-    pub fn set_sensor_mode(&mut self, pwr_mode : BMP388SensorPowerMode, 
+    pub fn set_sensor_mode(&mut self, pwr_mode : BMP388SensorPowerMode,
         enable_pressure: BMP388StatusPressureSensor, enable_temperature: BMP388StatusTemperatureSensor) -> Result<(), std::io::Error> {
         let reg_val = pwr_mode.value() << BME280_POWER_MODE_LOW_BIT | enable_temperature.value() << 1 | enable_pressure.value();
         debug!("Setting register BMP388_REG_POWER_CONTROL {BMP388_REG_POWER_CONTROL:#x} to value {reg_val:#010b}");
@@ -195,7 +227,7 @@ impl BMP388 {
         };
         let temperature_enabled = match (reg_val & BME280_TEMPERATURE_SENSOR_ENABLED_BIT) > 0 {
             false => BMP388StatusTemperatureSensor::Disabled,
-            true => BMP388StatusTemperatureSensor::Enabled,  
+            true => BMP388StatusTemperatureSensor::Enabled,
         };
         let sensor_mode = match reg_val >> BME280_POWER_MODE_LOW_BIT {
             0 => BMP388SensorPowerMode::Sleep,
@@ -205,7 +237,7 @@ impl BMP388 {
         Ok((sensor_mode, pressure_enabled, temperature_enabled))
     }
 
-    pub fn get_status(&mut self) 
+    pub fn get_status(&mut self)
         -> Result<(BMP388StatusCommandDecoder, BMP388StatusPressureData, BMP388StatusTemperatureData), std::io::Error> {
         // -- read current value of BMP388_REG_POWER_CONTROL
         let reg_val = i2cio::read_byte(&mut self.i2c, BMP388_REG_STATUS)?;
@@ -224,6 +256,268 @@ impl BMP388 {
         Ok((cmd_decoder_ready, pressure_data_ready, temperature_data_ready))
     }
 
+    fn get_int_status(&mut self) -> Result<u8, std::io::Error> {
+        // -- read INT status
+        debug!("Reading INT status");
+        i2cio::read_byte(&mut self.i2c, BMP388_REG_INT_STATUS)
+    }
+
+    pub fn is_data_ready(&mut self) -> Result<bool, std::io::Error> {
+        let int_status = self.get_int_status()?;
+        Ok(int_status & BME280_INT_STATUS_DATA_READY_BIT > 0)
+    }
+
+    pub fn enable_fifo(&mut self, stop_on_full: bool,
+        time_enable: bool, pressure_enable: bool, temperature_enable: bool,
+        subsampling: i8, filtered_data: bool) -> Result<(), std::io::Error> {
+        debug!("Enabling FIFO");
+        // -- flush fifo on enable to get rid of old data
+        self.flush_fifo()?;
+        // -- write config 2 first
+        let subsampling = match subsampling.is_negative() {
+            false => subsampling as u8,
+            true => 0,
+        };
+        let data_select_bit = (filtered_data as u8) << BME280_FIFO_DATA_SELECT_BIT;
+        let reg_config_2 = data_select_bit | subsampling;
+        debug!("Setting register BMP388_REG_FIFO_CONFIG_2 {BMP388_REG_FIFO_CONFIG_2:#x} to value {reg_config_2:#010b}");
+        i2cio::write_byte(&mut self.i2c, BMP388_REG_FIFO_CONFIG_2, reg_config_2)?;
+        let enable_fifo_bit = 1 as u8;
+        let stop_on_full_bit = (stop_on_full as u8) << BME280_FIFO_STOP_ON_FULL_BIT;
+        let time_enable_bit = (time_enable as u8) << BME280_FIFO_TIME_ENABLE_BIT;
+        let pressure_enable_bit = (pressure_enable as u8) << BME280_FIFO_PRESSURE_ENABLE_BIT;
+        let temperature_enable_bit = (temperature_enable as u8) << BME280_FIFO_TEMPERATURE_ENABLE_BIT;
+        let reg_config_1 = temperature_enable_bit | pressure_enable_bit | time_enable_bit | stop_on_full_bit | enable_fifo_bit;
+        debug!("Setting register BMP388_REG_FIFO_CONFIG_1 {BMP388_REG_FIFO_CONFIG_2:#x} to value {reg_config_1:#010b}");
+        let result = i2cio::write_byte(&mut self.i2c, BMP388_REG_FIFO_CONFIG_1, reg_config_1);
+        if result.is_ok() {
+            self.is_time_enabled = time_enable;
+        }
+        result
+    }
+
+    pub fn disable_fifo(&mut self) -> Result<(), std::io::Error> {
+        debug!("Disabling FIFO");
+        let reg_config_1 = BME280_FIFO_DISABLE_FIFO;
+        i2cio::write_byte(&mut self.i2c, BMP388_REG_FIFO_CONFIG_1, reg_config_1)
+    }
+
+    pub fn flush_fifo(&mut self) -> Result<(), std::io::Error> {
+        // -- initiate flush
+        debug!("Flushing FIFO");
+        i2cio::write_byte(&mut self.i2c, BMP388_REG_CMD, BMP388_CMD_FIFO_FLUSH)
+    }
+
+    pub fn get_fifo_length(&mut self) -> Result<u16, std::io::Error> {
+        // -- read current FIFO length
+        debug!("Reading FIFO length");
+        i2cio::read_word(&mut self.i2c, BMP388_REG_FIFO_LENGTH)
+    }
+
+    pub fn get_fifo_data(&mut self) -> Result<u8, std::io::Error> {
+        // -- read next FIFO data
+        debug!("Reading FIFO data");
+        i2cio::read_byte(&mut self.i2c, BMP388_REG_FIFO_DATA)
+    }
+
+    pub fn get_fifo_watermark(&mut self) -> Result<u16, std::io::Error> {
+        // -- read FIFO watermark
+        debug!("Reading FIFO watermark");
+        i2cio::read_word(&mut self.i2c, BMP388_REG_FIFO_WATERMARK)
+    }
+
+    fn read_fifo_frame_temperature(&mut self) -> Result<u32, std::io::Error> {
+        // -- use i2c block read to read 4 byte frame
+        let mut read_buf: [u8; 4] = [0; 4];
+        let bytes_read = self.i2c.i2c_read_block_data(BMP388_REG_FIFO_DATA, &mut read_buf)?;
+        debug!("Read {bytes_read} from FIFO data register for FIFO frame temperature");
+        // -- header is in byte 0, ignored here
+        let temperature_xlsb = read_buf[1] as u32;
+        let temperature_lsb = read_buf[2] as u32;
+        let temperature_msb = read_buf[3] as u32;
+        let temperatore_raw = temperature_msb << 16 | temperature_lsb << 8 | temperature_xlsb;
+        Ok(temperatore_raw)
+    }
+
+    fn read_fifo_frame_temperature_with_time(&mut self) -> Result<(u32, Option<u32>), std::io::Error> {
+        // -- use i2c block read to read 8 byte frame
+        let mut read_buf: [u8; 8] = [0; 8];
+        let bytes_read = self.i2c.i2c_read_block_data(BMP388_REG_FIFO_DATA, &mut read_buf)?;
+        debug!("Read {bytes_read} from FIFO data register for FIFO frame temperature with time ");
+        // -- header is in byte 0, ignored here
+        let temperature_xlsb = read_buf[1] as u32;
+        let temperature_lsb = read_buf[2] as u32;
+        let temperature_msb = read_buf[3] as u32;
+        let temperatore_raw = temperature_msb << 16 | temperature_lsb << 8 | temperature_xlsb;
+        let time_header = read_buf[4];
+        let sensor_time = if time_header & BME280_FIFO_SENSOR_FRAME_TIME_BIT > 0 {
+            let time_xlsb = read_buf[5] as u32;
+            let time_lsb = read_buf[6] as u32;
+            let time_msb = read_buf[7] as u32;
+            let sensor_time = time_msb << 16 | time_lsb << 8 | time_xlsb;
+            Some(sensor_time)
+        } else {
+            None
+        };
+        Ok((temperatore_raw, sensor_time))
+    }
+
+    fn read_fifo_frame_pressure(&mut self) -> Result<u32, std::io::Error> {
+        // -- use i2c block read to read 4 byte frame
+        let mut read_buf: [u8; 4] = [0; 4];
+        let bytes_read = self.i2c.i2c_read_block_data(BMP388_REG_FIFO_DATA, &mut read_buf)?;
+        debug!("Read {bytes_read} from FIFO data register for FIFO frame pressure");
+        // -- header is in byte 0, ignored here
+        let pressure_xlsb = read_buf[1] as u32;
+        let pressure_lsb = read_buf[2] as u32;
+        let pressure_msb = read_buf[3] as u32;
+        let pressure_raw = pressure_msb << 16 | pressure_lsb << 8 | pressure_xlsb;
+        Ok(pressure_raw)
+    }
+
+    fn read_fifo_frame_pressure_with_time(&mut self) -> Result<(u32, Option<u32>), std::io::Error> {
+        // -- use i2c block read to read 8 byte frame
+        let mut read_buf: [u8; 8] = [0; 8];
+        let bytes_read = self.i2c.i2c_read_block_data(BMP388_REG_FIFO_DATA, &mut read_buf)?;
+        debug!("Read {bytes_read} from FIFO data register for FIFO frame pressure with time");
+        // -- header is in byte 0, ignored here
+        let pressure_xlsb = read_buf[1] as u32;
+        let pressure_lsb = read_buf[2] as u32;
+        let pressure_msb = read_buf[3] as u32;
+        let pressure_raw = pressure_msb << 16 | pressure_lsb << 8 | pressure_xlsb;
+        let time_header = read_buf[4];
+        let sensor_time = if time_header & BME280_FIFO_SENSOR_FRAME_TIME_BIT > 0 {
+            let time_xlsb = read_buf[5] as u32;
+            let time_lsb = read_buf[6] as u32;
+            let time_msb = read_buf[7] as u32;
+            let sensor_time = time_msb << 16 | time_lsb << 8 | time_xlsb;
+            Some(sensor_time)
+        } else {
+            None
+        };
+        Ok((pressure_raw, sensor_time))
+    }
+
+    fn read_fifo_frame_pressure_temperature(&mut self) -> Result<(u32, u32), std::io::Error> {
+        // -- use i2c block read to read 7 byte frame
+        let mut read_buf: [u8; 7] = [0; 7];
+        let bytes_read = self.i2c.i2c_read_block_data(BMP388_REG_FIFO_DATA, &mut read_buf)?;
+        debug!("Read {bytes_read} from FIFO data register for FIFO frame pressure and temperature");
+        // -- header is in byte 0, ignored here
+        let temperature_xlsb = read_buf[1] as u32;
+        let temperature_lsb = read_buf[2] as u32;
+        let temperature_msb = read_buf[3] as u32;
+        let temperatore_raw = temperature_msb << 16 | temperature_lsb << 8 | temperature_xlsb;
+        let pressure_xlsb = read_buf[4] as u32;
+        let pressure_lsb = read_buf[5] as u32;
+        let pressure_msb = read_buf[6] as u32;
+        let pressure_raw = pressure_msb << 16 | pressure_lsb << 8 | pressure_xlsb;
+        Ok((pressure_raw, temperatore_raw))
+    }
+
+    fn read_fifo_frame_pressure_temperature_with_time(&mut self) -> Result<(u32, u32, Option<u32>), std::io::Error> {
+        // -- use i2c block read to read 11 byte frame
+        let mut read_buf: [u8; 11] = [0; 11];
+        let bytes_read = self.i2c.i2c_read_block_data(BMP388_REG_FIFO_DATA, &mut read_buf)?;
+        debug!("Read {bytes_read} from FIFO data register for FIFO frame pressure and temperature with time");
+        // -- header is in byte 0, ignored here
+        let temperature_xlsb = read_buf[1] as u32;
+        let temperature_lsb = read_buf[2] as u32;
+        let temperature_msb = read_buf[3] as u32;
+        let temperatore_raw = temperature_msb << 16 | temperature_lsb << 8 | temperature_xlsb;
+        let pressure_xlsb = read_buf[4] as u32;
+        let pressure_lsb = read_buf[5] as u32;
+        let pressure_msb = read_buf[6] as u32;
+        let pressure_raw = pressure_msb << 16 | pressure_lsb << 8 | pressure_xlsb;
+        let time_header = read_buf[7];
+        let sensor_time = if time_header & BME280_FIFO_SENSOR_FRAME_TIME_BIT > 0 {
+            let time_xlsb = read_buf[8] as u32;
+            let time_lsb = read_buf[9] as u32;
+            let time_msb = read_buf[10] as u32;
+            let sensor_time = time_msb << 16 | time_lsb << 8 | time_xlsb;
+            Some(sensor_time)
+        } else {
+            None
+        };
+        Ok((pressure_raw, temperatore_raw, sensor_time))
+    }
+
+    pub fn read_next_fifo_data_frame(&mut self, ) -> Result<FifoData, std::io::Error> {
+        // -- read FIFO data frame
+        debug!("Reading FIFO data frame");
+        // -- peek header to determine what frame to read
+        let header = self.get_fifo_data()?;
+        if header & BME280_FIFO_CONTROL_FRAME_BIT > 0 {
+            // -- either a config error or a config change
+            if header & BME280_FIFO_CONTROL_FRAME_CONFIG_ERROR_BIT > 0 {
+                let _data_word = self.i2c.smbus_read_word_data(BMP388_REG_FIFO_DATA)?;
+                return Err(std::io::Error::other("FIFO configuration error"))
+            } else if header & BME280_FIFO_CONTROL_FRAME_CONFIG_CHANGE_BIT > 0 {
+                let _data_word = self.i2c.smbus_read_word_data(BMP388_REG_FIFO_DATA)?;
+                return Ok(FifoData {
+                    pressure_raw: None, temperature_raw: None, sensor_time: None, config_change: true,
+                })
+            } else {
+                return Err(std::io::Error::other(format!("Unknown FIFO control header: {header:#010b}")))
+            }
+        }
+        else if header & BME280_FIFO_SENSOR_FRAME_BIT > 0 {
+            if header & BME280_FIFO_SENSOR_FRAME_TEMPERATURE_BIT > 0 && header & BME280_FIFO_SENSOR_FRAME_PRESSURE_BIT > 0 {
+                if self.is_time_enabled {
+                    let (pressure_raw, temperature_raw, sensor_time) = self.read_fifo_frame_pressure_temperature_with_time()?;
+                    let pressure_raw = Some(pressure_raw);
+                    let temperature_raw = Some(temperature_raw);                    
+                    return Ok(FifoData {
+                        pressure_raw: pressure_raw, temperature_raw, sensor_time, config_change: false,
+                    })
+                } else {
+                    let (pressure_raw, temperature_raw) = self.read_fifo_frame_pressure_temperature()?;
+                    let pressure_raw = Some(pressure_raw);
+                    let temperature_raw = Some(temperature_raw);
+                    return Ok(FifoData {
+                        pressure_raw: pressure_raw, temperature_raw, sensor_time: None, config_change: false,
+                    })
+                }
+            } else if header & BME280_FIFO_SENSOR_FRAME_TEMPERATURE_BIT > 0 {
+                if self.is_time_enabled {
+                    let (temperature_raw, sensor_time) = self.read_fifo_frame_temperature_with_time()?;
+                    let temperature_raw = Some(temperature_raw);                    
+                    return Ok(FifoData {
+                        pressure_raw: None, temperature_raw, sensor_time, config_change: false,
+                    })
+                } else {
+                    let temperature_raw = self.read_fifo_frame_temperature()?;
+                    let temperature_raw = Some(temperature_raw);
+                    return Ok(FifoData {
+                        pressure_raw: None, temperature_raw, sensor_time: None, config_change: false,
+                    })
+                }                
+            } else if header & BME280_FIFO_SENSOR_FRAME_PRESSURE_BIT > 0 {
+                if self.is_time_enabled {
+                    let (pressure_raw, sensor_time) = self.read_fifo_frame_pressure_with_time()?;
+                    let pressure_raw = Some(pressure_raw);                    
+                    return Ok(FifoData {
+                        pressure_raw, temperature_raw: None, sensor_time, config_change: false,
+                    })
+                } else {
+                    let pressure_raw = self.read_fifo_frame_pressure()?;
+                    let pressure_raw = Some(pressure_raw);
+                    return Ok(FifoData {
+                        pressure_raw, temperature_raw: None, sensor_time: None, config_change: false,
+                    })
+                }                    
+            } else {
+                // -- empty frame
+                let _data_word = self.i2c.smbus_read_word_data(BMP388_REG_FIFO_DATA)?;
+                return Ok(FifoData {
+                    pressure_raw: None, temperature_raw: None, sensor_time: None, config_change: false,
+                })
+            }
+        }
+        return Err(std::io::Error::other(format!("Unknown FIFO header: {header:#010b}")))
+    }
+
+
     fn concat_bytes(msb: u8, lsb: u8) -> u16 {
         ((msb as u16) << 8) | (lsb as u16)
     }
@@ -234,8 +528,8 @@ impl BMP388 {
         let _bytes_read = i2c.i2c_read_block_data(BMP388_REG_TRIMMING_COEFFICIENTS, &mut reg_data)?;
         // -- temperature calibration coefficients
         let par_t1 = Self::concat_bytes(reg_data[1], reg_data[0]);
-        // let par_t1 = par_t1 as f64 / 0.00390625;  
-        let par_t1 = par_t1 as f64 * 256.0; // == 1 / 0.00390625;  
+        // let par_t1 = par_t1 as f64 / 0.00390625;
+        let par_t1 = par_t1 as f64 * 256.0; // == 1 / 0.00390625;
         let par_t2 = Self::concat_bytes(reg_data[3], reg_data[2]);
         // let par_t2 = par_t2 as f64 / 1073741824.0;
         let par_t2 = par_t2 as f64 * 0.000000000931323; // == 1 / 1073741824.0
@@ -244,45 +538,45 @@ impl BMP388 {
         let par_t3 = par_t3 as f64 * 0.000000000000004; // == 1 / 281474976710656.0
 
         // -- pressure calibration coefficients
-        let par_p1 = Self::concat_bytes(reg_data[6], reg_data[5]) as i16;        
+        let par_p1 = Self::concat_bytes(reg_data[6], reg_data[5]) as i16;
         //let par_p1 = (par_p1 - 16384) as f64 / 1048576.0;
         let par_p1 = (par_p1 - 16384) as f64 * 0.000000953674316;
-        let par_p2 = Self::concat_bytes(reg_data[8], reg_data[7]) as i16;        
+        let par_p2 = Self::concat_bytes(reg_data[8], reg_data[7]) as i16;
         //let par_p2 = (par_p2 - 16384) as f64 / 536870912.0;
         let par_p2 = (par_p2 - 16384) as f64 * 0.000000001862645;
-        let par_p3 = reg_data[9] as i8;        
+        let par_p3 = reg_data[9] as i8;
         //let par_p3 = par_p3 as f64 / 4294967296.0;
         let par_p3 = par_p3 as f64 * 0.000000000232831;
-        let par_p4 = reg_data[10] as i8;        
+        let par_p4 = reg_data[10] as i8;
         //let par_p4 = (par_p4 as f64) / 137438953472.0;
         let par_p4 = (par_p4 as f64) * 0.000000000007276;
         let par_p5 = Self::concat_bytes(reg_data[12], reg_data[11]);
         //let par_p5 = (par_p5 as f64) / 0.125;
         let par_p5 = (par_p5 as f64) * 8.0;
-        let par_p6 = Self::concat_bytes(reg_data[14], reg_data[13]);        
+        let par_p6 = Self::concat_bytes(reg_data[14], reg_data[13]);
         //let par_p6 = (par_p6 as f64) / 64.0;
         let par_p6 = (par_p6 as f64) * 0.015625;
-        let par_p7 = reg_data[15] as i8;        
+        let par_p7 = reg_data[15] as i8;
         //let par_p7 = (par_p7 as f64) / 256.0;
         let par_p7 = (par_p7 as f64) * 0.00390625;
-        let par_p8 = reg_data[16] as i8;        
+        let par_p8 = reg_data[16] as i8;
         //let par_p8 = (par_p8 as f64) / 32768.0;
         let par_p8 = (par_p8 as f64) * 0.000030517578125;
-        let par_p9 = Self::concat_bytes(reg_data[18], reg_data[17]) as i16;        
+        let par_p9 = Self::concat_bytes(reg_data[18], reg_data[17]) as i16;
         //let par_p9 = (par_p9 as f64) / 281474976710656.0;
         let par_p9 = (par_p9 as f64) * 0.000000000000004;
         let par_p10 = reg_data[19] as i8;
         //let par_p10 = (par_p10 as f64) / 281474976710656.0;
         let par_p10 = (par_p10 as f64) * 0.000000000000004;
         let par_p11 = reg_data[20] as i8;
-        //let par_p11 = (par_p11 as f64) / 36893488147419103232.0;        
+        //let par_p11 = (par_p11 as f64) / 36893488147419103232.0;
         let par_p11 = (par_p11 as f64) * 0.00000000000000000002710505431213761;
 
         // -- create calibration structure
         let calib_data = CalibData {
             par_t1, par_t2, par_t3,
-            par_p1, par_p2, par_p3, par_p4, par_p5, par_p6, 
-            par_p7, par_p8, par_p9, par_p10, par_p11,            
+            par_p1, par_p2, par_p3, par_p4, par_p5, par_p6,
+            par_p7, par_p8, par_p9, par_p10, par_p11,
         };
         debug!("Got calibration data: {calib_data:#?}");
         Ok(calib_data)
@@ -309,7 +603,7 @@ impl BMP388 {
             temperature,
         };
         debug!("Got raw data: {raw_data:#?}");
-        self.raw_data = raw_data;        
+        self.raw_data = raw_data;
         Ok(())
     }
 
@@ -338,18 +632,26 @@ impl BMP388 {
         i2cio::write_byte(&mut self.i2c, BMP388_REG_OVERSAMPLING_RATE, reg_val)
     }
 
-    pub fn get_temperature(&self) -> f64 {    
-        let temperature = self.raw_data.temperature as f64;
-        let partial_data1 = temperature - self.calib_data.par_t1;
-        let partial_data2 = partial_data1 * self.calib_data.par_t2;
-        let t_lin = partial_data2 + ((partial_data1 * partial_data1) * self.calib_data.par_t3);
-        t_lin
+    pub fn get_temperature(&self) -> f64 {
+        self.get_temperature_with_raw(self.raw_data.temperature)
     }
 
-    pub fn get_pressure(&self, temperature: f64) -> f64 {    
+    pub fn get_temperature_with_raw(&self, temperature_raw: u32) -> f64 {
+        let temperature_raw = temperature_raw as f64;
+        let partial_data1 = temperature_raw - self.calib_data.par_t1;
+        let partial_data2 = partial_data1 * self.calib_data.par_t2;
+        let temperature = partial_data2 + ((partial_data1 * partial_data1) * self.calib_data.par_t3);
+        temperature
+    }
+
+    pub fn get_pressure(&self, temperature: f64) -> f64 {
+        self.get_pressure_with_raw(self.raw_data.pressure, temperature)
+    }
+
+    pub fn get_pressure_with_raw(&self, pressure_raw: u32, temperature: f64) -> f64 {
         let temperature_pow_2 = temperature.powi(2);
         let temperature_pow_3 = temperature.powi(3);
-        let pressure_raw = self.raw_data.pressure as f64;
+        let pressure_raw = pressure_raw as f64;
         let partial_data1 = self.calib_data.par_p6 * temperature;
         let partial_data2 = self.calib_data.par_p7 * temperature_pow_2;
         let partial_data3 = self.calib_data.par_p8 * temperature_pow_3;

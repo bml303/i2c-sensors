@@ -1,6 +1,6 @@
 [package]
 name = "i2c-sensors"
-version = "0.1.6"
+version = "0.1.7"
 authors = ["Beat Liechti <beat@softbase.tech>"]
 edition = "2021"
 
