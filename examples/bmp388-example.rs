@@ -5,14 +5,7 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::{thread, time};
 
-use i2c_sensors::bmp388::{
-    BMP388, BMP388DeviceAddress,
-    BMP388IrrFilter, BMP388OutputDataRate,
-    BMP388OverSamplingPr, BMP388OverSamplingTp,
-    BMP388SensorPowerMode, BMP388StatusPressureSensor,
-    BMP388StatusTemperatureSensor,
-    BMP388StatusPressureData, BMP388StatusTemperatureData,
-};
+use i2c_sensors::bmp388::*;
 
 const EXIT_CODE_SET_CTR_C_HNDLR_FAILED: u8 = 0x02;
 const EXIT_CODE_BMP388_INIT_FAILED: u8 = 0x61;
@@ -45,11 +38,11 @@ fn get_sensor_settings(mode: &AcquisitionMode) -> (BMP388OverSamplingPr, BMP388O
     BMP388IrrFilter, BMP388OutputDataRate) {
     match mode {
         AcquisitionMode::Forced => (BMP388OverSamplingPr::UltraLowX1, BMP388OverSamplingTp::X1,
-            BMP388IrrFilter::Off, BMP388OutputDataRate::Odr0p78),
+            BMP388IrrFilter::Off, BMP388OutputDataRate::Ix0_78Hz),
         AcquisitionMode::Normal => (BMP388OverSamplingPr::HighX8, BMP388OverSamplingTp::X1,
-            BMP388IrrFilter::Coef1, BMP388OutputDataRate::Odr0p78),
+            BMP388IrrFilter::Coef1, BMP388OutputDataRate::Ix0_78Hz),
         AcquisitionMode::Fifo => (BMP388OverSamplingPr::HighX8, BMP388OverSamplingTp::X1,
-            BMP388IrrFilter::Coef1, BMP388OutputDataRate::Odr0p78),
+            BMP388IrrFilter::Coef1, BMP388OutputDataRate::Ix0_78Hz),
     }
 
 }
@@ -99,13 +92,13 @@ fn main() -> ExitCode {
         }
         if args.mode == AcquisitionMode::Fifo {
             // -- enable fifo
-            let stop_on_full = true;
-            let time_enable = true;
-            let pressure_enable = true;
-            let temperature_enable = true;
+            let stop_on_full = BMP388FifoStopOnFull::Enabled;
+            let with_pressure = BMP388FifoWithPressureData::Enabled;
+            let with_temperature = BMP388FifoWithTemperatureData::Enabled;
+            let with_sensor_time = BMP388FifoWithSensorTime::Enabled;
+            let data_filtered = BMP388FifoDataFiltered::Filtered;
             let subsampling = 0;
-            let filtered_data = true;
-            if let Err(err) = bmp388.enable_fifo(stop_on_full, time_enable, pressure_enable, temperature_enable, subsampling, filtered_data) {
+            if let Err(err) = bmp388.enable_fifo(stop_on_full, with_pressure, with_temperature, with_sensor_time, data_filtered, subsampling) {
                 error!("ERROR - Failed to enable BMP388 FIFO: {err}");
                 return ExitCode::from(EXIT_CODE_BMP388_ENABLE_FIFO_FAILED);
             }
@@ -187,12 +180,12 @@ fn main() -> ExitCode {
                 if let Some(temperature_raw) = fifo_frame.temperature_raw {
                     info!("BMP388 FIFO temperature raw: {temperature_raw}");
                     // -- get the compensated temperature
-                    let temperature = bmp388.get_temperature_with_raw(temperature_raw);
+                    let temperature = bmp388.get_temperature(temperature_raw);
                     temperature_last = temperature;
                     if let Some(pressure_raw) = fifo_frame.pressure_raw {
                         info!("BMP388 FIFO pressure raw: {pressure_raw}");
                         // -- get the compensated pressure
-                        let pressure = bmp388.get_pressure_with_raw(pressure_raw, temperature);
+                        let pressure = bmp388.get_pressure(pressure_raw, temperature);
                         info!("pressure: {pressure}, temperature: {temperature}");
                     } else {
                         info!("pressure: <no data>>, temperature: {temperature}");
@@ -200,7 +193,7 @@ fn main() -> ExitCode {
                 } else if let Some(pressure_raw) = fifo_frame.pressure_raw {
                     info!("BMP388 FIFO pressure raw: {pressure_raw}");
                     // -- get the compensated pressure
-                    let pressure = bmp388.get_pressure_with_raw(pressure_raw, temperature_last);
+                    let pressure = bmp388.get_pressure(pressure_raw, temperature_last);
                     info!("pressure: {pressure}, temperature: <no data>");
                 }
                 let fifo_length = match bmp388.get_fifo_length() {
@@ -220,13 +213,15 @@ fn main() -> ExitCode {
             }
         } else {
             // -- get the raw data
-            if let Err(err) = bmp388.get_data_raw() {
-                error!("ERROR - Failed to get raw data from BMP388: {err}");
-                return ExitCode::from(EXIT_CODE_BMP388_GET_DATA_RAW_FAILED);
+            let data_raw = match  bmp388.get_data_raw() {
+                Ok(data_raw) => data_raw,
+                Err(err) => {
+                    error!("ERROR - Failed to get raw data from BMP388: {err}");
+                    return ExitCode::from(EXIT_CODE_BMP388_GET_DATA_RAW_FAILED);
+                },
             };
             // -- get the compensated data
-            let temperature = bmp388.get_temperature();
-            let pressure = bmp388.get_pressure(temperature);
+            let (pressure, temperature) = bmp388.get_pressure_and_temperature(&data_raw);
             info!("pressure: {pressure}, temperature: {temperature}");
         }
         // -- delay next reading

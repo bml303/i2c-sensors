@@ -182,33 +182,33 @@ impl fmt::Display for BMP388OverSamplingTp {
 }
 
 pub enum BMP388OutputDataRate {
-    Odr200, Odr100, Odr50, Odr25, Odr12p5, 
-    Odr6p25, Odr3p1, Odr1p5, Odr0p78, Odr0p39, 
-    Odr0p2, Odr0p1, Odr0p05, Odr0p02, Odr0p01,
-    Odr0p006, Odr0p003, Odr0p0015,
+    Ax200Hz, Bx100Hz, Cx50Hz, Dx25Hz, Ex12_5Hz, 
+    Fx6_25Hz, Gx3_1Hz, Hx1_5Hz, Ix0_78Hz, Jx0_39Hz, 
+    Kx0_2Hz, Lx0_1Hz, Mx0_05Hz, Nx0_02Hz, Ox0_01Hz,
+    Px0_006Hz, Qx0_003Hz, Rx0_0015Hz,
 }
 
 impl BMP388OutputDataRate {
     pub fn value(&self) -> u8 {
         match *self {
-            Self::Odr200 => 0x00,
-            Self::Odr100 => 0x01,
-            Self::Odr50 => 0x02,
-            Self::Odr25 => 0x03,
-            Self::Odr12p5 => 0x04,
-            Self::Odr6p25 => 0x05,
-            Self::Odr3p1 => 0x06,
-            Self::Odr1p5 => 0x07,
-            Self::Odr0p78 => 0x08,
-            Self::Odr0p39 => 0x09,
-            Self::Odr0p2 => 0x0a,
-            Self::Odr0p1 => 0x0b,
-            Self::Odr0p05 => 0x0c,
-            Self::Odr0p02 => 0x0d,
-            Self::Odr0p01 => 0x0e,
-            Self::Odr0p006 => 0x0f,
-            Self::Odr0p003 => 0x10,
-            Self::Odr0p0015 => 0x11,
+            Self::Ax200Hz => 0x00,
+            Self::Bx100Hz => 0x01,
+            Self::Cx50Hz => 0x02,
+            Self::Dx25Hz => 0x03,
+            Self::Ex12_5Hz => 0x04,
+            Self::Fx6_25Hz => 0x05,
+            Self::Gx3_1Hz => 0x06,
+            Self::Hx1_5Hz => 0x07,
+            Self::Ix0_78Hz => 0x08,
+            Self::Jx0_39Hz => 0x09,
+            Self::Kx0_2Hz => 0x0a,
+            Self::Lx0_1Hz => 0x0b,
+            Self::Mx0_05Hz => 0x0c,
+            Self::Nx0_02Hz => 0x0d,
+            Self::Ox0_01Hz => 0x0e,
+            Self::Px0_006Hz => 0x0f,
+            Self::Qx0_003Hz => 0x10,
+            Self::Rx0_0015Hz => 0x11,
         }
     }
 }
@@ -244,7 +244,7 @@ impl BMP388IrrFilter {
 #[derive(PartialEq)]
 pub enum BMP388StatusCommandDecoder {
     NotReady,
-    Ready
+    Ready,
 }
 
 impl fmt::Display for BMP388StatusCommandDecoder {
@@ -259,7 +259,7 @@ impl fmt::Display for BMP388StatusCommandDecoder {
 #[derive(PartialEq)]
 pub enum BMP388StatusPressureData {
     NotReady,
-    Ready
+    Ready,
 }
 
 impl fmt::Display for BMP388StatusPressureData {
@@ -274,7 +274,7 @@ impl fmt::Display for BMP388StatusPressureData {
 #[derive(PartialEq)]
 pub enum BMP388StatusTemperatureData {
     NotReady,
-    Ready
+    Ready,
 }
 
 impl fmt::Display for BMP388StatusTemperatureData {
@@ -286,3 +286,77 @@ impl fmt::Display for BMP388StatusTemperatureData {
     }
 }
 
+#[derive(PartialEq)]
+pub enum BMP388FifoStopOnFull {
+    Disabled,
+    Enabled,
+}
+
+impl BMP388FifoStopOnFull {
+    pub fn value(&self) -> u8 {
+        match *self {
+            Self::Disabled => 0,
+            Self::Enabled => 1,
+        }
+    }
+}
+
+#[derive(PartialEq)]
+pub enum BMP388FifoWithPressureData {
+    Disabled,
+    Enabled,
+}
+
+impl BMP388FifoWithPressureData {
+    pub fn value(&self) -> u8 {
+        match *self {
+            Self::Disabled => 0,
+            Self::Enabled => 1,
+        }
+    }
+}
+
+#[derive(PartialEq)]
+pub enum BMP388FifoWithTemperatureData {
+    Disabled,
+    Enabled,
+}
+
+impl BMP388FifoWithTemperatureData {
+    pub fn value(&self) -> u8 {
+        match *self {
+            Self::Disabled => 0,
+            Self::Enabled => 1,
+        }
+    }
+}
+
+#[derive(PartialEq)]
+pub enum BMP388FifoWithSensorTime {
+    Disabled,
+    Enabled,
+}
+
+impl BMP388FifoWithSensorTime {
+    pub fn value(&self) -> u8 {
+        match *self {
+            Self::Disabled => 0,
+            Self::Enabled => 1,
+        }
+    }
+}
+
+#[derive(PartialEq)]
+pub enum BMP388FifoDataFiltered {
+    Unfiltered,
+    Filtered,
+}
+
+impl BMP388FifoDataFiltered {
+    pub fn value(&self) -> u8 {
+        match *self {
+            Self::Unfiltered => 0,
+            Self::Filtered => 1,
+        }
+    }
+}
