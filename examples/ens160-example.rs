@@ -1,17 +1,21 @@
-# i2c-sensors
-
-This is a library to work with i2c sensors like BME280, BMP388, ENS160, SHT31, TMP117 and similar.
-
-```rust
+use clap::Parser;
 use i2c_sensors::ens160::{
     Ens160DeviceAddress,
     ENS160,
 };
 use std::path::Path;
 
+#[derive(Parser)]
+struct Args {
+    // -- i2c bus device
+    bus_path: String,
+}
+
+
 fn main() {
 
-    let bus_path = Path::new("/dev/i2c-0");
+    let args = Args::parse();
+    let bus_path = Path::new(&args.bus_path);
     let device_addr = Ens160DeviceAddress::Default;
     
     let mut ens160 = ENS160::new(bus_path, device_addr)
@@ -37,22 +41,3 @@ fn main() {
     println!("ENS160 Equivalent CO2 Concentration (ppm): {ens160_eco2}");
 
 }
-```
-
-Run the example for BMP388
-
-```shell
-cargo run --example bmp388-example /dev/i2c-0 fifo
-```
-
-Run the example for ENS160
-
-```shell
-cargo run --example ens160-example /dev/i2c-0 single
-```
-
-Run the example for SHT31
-
-```shell
-cargo run --example sht31-example /dev/i2c-0 single
-```
