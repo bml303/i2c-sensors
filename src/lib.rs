@@ -1,4 +1,5 @@
 pub mod bme280;
+pub mod bme680;
 pub mod bmp388;
 pub mod ens160;
 pub mod ht16k33;
