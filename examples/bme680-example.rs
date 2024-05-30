@@ -1,6 +1,7 @@
 use chrono::Local;
 use clap::Parser;
 use log::{error, info};
+use std::collections::VecDeque;
 use std::path::Path;
 use std::process::ExitCode;
 use std::{thread, time};
@@ -22,6 +23,25 @@ const EXIT_CODE_BME680_GET_GAS_MEASURING_RESULT_FAILED: u8 = 0x79;
 struct Args {
     // -- i2c bus device
     bus_path: String,
+}
+
+// -- curtesy of https://github.com/thstielow/raspi-bme680-iaq/blob/main/bme680IAQ.py
+// -- calculates the saturation water density of air at the current temperature (in °C)
+// -- return the saturation density rho_max in kg/m^3
+// -- this is equal to a relative humidity of 100% at the current temperature 
+fn water_sat_density(temperature: f64) -> f64 {
+    let exp = (17.62 * temperature)/(243.12 + temperature).exp();
+    let rho_max = (6.112 * 100.0 * exp)/(461.52 * (temperature + 273.15));
+    rho_max
+}
+
+fn calc_mean(data: &VecDeque<f64>) -> f64 {
+    let data_iter = data.iter();
+    let mut sum = 0.0;
+    for val in data_iter {
+        sum += val;
+    }
+    sum / data.len() as f64
 }
 
 fn main() -> ExitCode {
@@ -64,32 +84,43 @@ fn main() -> ExitCode {
     let chip_id = bme680.get_chip_id();
     info!("Got chip id {chip_id:#04x}");    
     
-    if let Err(err) = bme680.set_gas_wait_0(25, Bme680GasWaitMultiplicationFactor::X4) {
-        error!("ERROR - BME680 failed to set gas wait: {err}");
-        return ExitCode::from(EXIT_CODE_BME680_SET_GAS_WAIT_FAILED);
-    }
 
-    let amb_temp = 20.0;
-    let target_temp = 300.0;
-    let res_heat = bme680.calc_res_heat(amb_temp, target_temp);
-
-    if let Err(err) = bme680.set_res_heat_0(res_heat) {
-        error!("ERROR - BME680 failed to set res heat: {err}");
-        return ExitCode::from(EXIT_CODE_BME680_SET_RES_HEAT_FAILED);
-    }    
-
-
-    if let Err(err) = bme680.set_heater_profile(Bme680HeaterProfile::SetPoint0) {
-        error!("ERROR - BME680 failed to set heater profile: {err}");
-        return ExitCode::from(EXIT_CODE_BME680_SET_HEATER_PROFILE_FAILED);
-    }
-
-    if let Err(err) = bme680.enable_run_gas() {
-        error!("ERROR - BME680 failed to enable run gas: {err}");
-        return ExitCode::from(EXIT_CODE_BME680_ENABLE_RUN_GAS_FAILED);
-    }    
+    // -- assume ambient temperature for first run, then use measured value
+    const MEASURING_DELAY_SEC: u64 = 5;
+    const BURN_IN_CYCLES: u64 = 100;
+    let mut ambient_temp = 20.0;
+    const PH_SLOPE: f64 = 0.01;
+    let mut burn_in_cycles = BURN_IN_CYCLES / MEASURING_DELAY_SEC;
+    let mut gas_cal_data: VecDeque<f64> = VecDeque::new();
+    let mut gas_ceil = 0.0;
+    const GAS_RECAL_PERIOD: usize = 3600 / MEASURING_DELAY_SEC as usize;
+    let mut gas_recal_step: usize = 0;
+    let mut aq_data: VecDeque<f64> = VecDeque::new();
 
     loop {
+
+        if let Err(err) = bme680.set_gas_wait_0(40, Bme680GasWaitMultiplicationFactor::X4) {
+            error!("ERROR - BME680 failed to set gas wait: {err}");
+            return ExitCode::from(EXIT_CODE_BME680_SET_GAS_WAIT_FAILED);
+        }
+    
+        const TARGET_TEMP: f64 = 320.0;
+        let res_heat = bme680.calc_res_heat(ambient_temp, TARGET_TEMP);
+    
+        if let Err(err) = bme680.set_res_heat_0(res_heat) {
+            error!("ERROR - BME680 failed to set res heat: {err}");
+            return ExitCode::from(EXIT_CODE_BME680_SET_RES_HEAT_FAILED);
+        }    
+    
+        if let Err(err) = bme680.set_heater_profile(Bme680HeaterProfile::SetPoint0) {
+            error!("ERROR - BME680 failed to set heater profile: {err}");
+            return ExitCode::from(EXIT_CODE_BME680_SET_HEATER_PROFILE_FAILED);
+        }
+    
+        if let Err(err) = bme680.enable_run_gas() {
+            error!("ERROR - BME680 failed to enable run gas: {err}");
+            return ExitCode::from(EXIT_CODE_BME680_ENABLE_RUN_GAS_FAILED);
+        }
 
         if let Err(err) = bme680.set_forced_mode() {
             error!("ERROR - BME680 failed to set forced mode: {err}");
@@ -132,17 +163,77 @@ fn main() -> ExitCode {
         let humidity = bme680.get_humidity(result.humidity_raw, temperature);
         info!("Got compensated humidity {humidity}");
         // -- get gas resistance
-        let gas_res = match bme680.get_gas_meas_result() {
+        let gas_result = match bme680.get_gas_meas_result() {
             Ok(result) => result,
             Err(err) => {
                 error!("ERROR - BME680 failed get gas measuring result: {err}");
                 return ExitCode::from(EXIT_CODE_BME680_GET_GAS_MEASURING_RESULT_FAILED);
             } 
         };
-        info!("Got gas resistance {gas_res}");
+        info!("Got gas resistance {gas_result:#?}");
+
+        // -- store ambient temperature for next loop
+        ambient_temp = temperature;
+
+        if !(gas_result.gas_valid && gas_result.heat_stab) {
+            // -- skip measurement if not valid or heater not stable (or both)
+            continue
+        }
+
+        // -- get saturation water density of air
+        let rho_max = water_sat_density(temperature);
+        // -- absolute humidity
+        let hum_abs = humidity * 10.0 * rho_max;
+        // -- compensate exponential impact of humidity on resistance
+		let comp_gas = gas_result.gas_res * (PH_SLOPE * hum_abs).exp();
+
+        // -- burn-in or not 
+        if burn_in_cycles > 0 {
+            burn_in_cycles -= 1;
+            if comp_gas > gas_ceil {
+                gas_cal_data.clear();   
+                gas_cal_data.push_front(comp_gas);
+                gas_ceil = comp_gas;
+            }
+            info!("Burn-in cycle {burn_in_cycles}: gas_ceil {gas_ceil}")
+        } else {
+            // -- adapt calibration
+			if comp_gas > gas_ceil {
+				gas_cal_data.push_back(comp_gas);
+				if gas_cal_data.len() > 100 {
+                    gas_cal_data.pop_front();
+                }
+                gas_ceil = calc_mean(&gas_cal_data);
+            }
+
+            // -- calculate and print relative air quality on a scale of 0-100%
+			// -- use quadratic ratio for steeper scaling at high air quality
+			// -- clip air quality at 100%
+
+            let aqr = comp_gas / gas_ceil;
+			let aq = (aqr.powi(2)).min(1.0) * 100.0;
+            aq_data.push_back(aq);
+            while aq_data.len() > 10 {
+                aq_data.pop_front();
+            }
+            let aq = calc_mean(&aq_data);
+            let aqi = (1.0 - (aq / 100.0)) * 500.0;
+            info!("AQR {aqr}, Air Quality Index {aqi}, AQ {aq}%, comp_gas {comp_gas}, aq_data len {}", aq_data.len());
+
+
+            // -- for compensating negative drift (dropping resistance) of the gas sensor:
+			// -- delete oldest value from calibration list and add current value
+			gas_recal_step += 1;
+			if gas_recal_step >= GAS_RECAL_PERIOD {
+                gas_recal_step = 0;
+				gas_cal_data.push_back(comp_gas);
+                gas_cal_data.pop_front();
+                gas_ceil = calc_mean(&gas_cal_data);
+            }
+        }
 
         // -- delay next measuring
-        let measuring_delay = time::Duration::from_millis(2000);
+        let measuring_delay = time::Duration::from_millis(MEASURING_DELAY_SEC * 1000);
         thread::sleep(measuring_delay);
     }    
 }

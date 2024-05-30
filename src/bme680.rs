@@ -17,7 +17,7 @@ const BME280_REG_MEAS_RESULT_BASE: u8 = 0x1f;
 #[allow(dead_code)]
 const BME280_REG_IDAC_HEAT_BASE: u8 = 0x50;
 const BME280_REG_RES_HEAT_BASE: u8 = 0x5a;
-const BME280_REG_GAS_WAIT_BASE: u8 = 0x54;
+const BME280_REG_GAS_WAIT_BASE: u8 = 0x64;
 const BME280_REG_GAS_ACD_MSB: u8 = 0x2a;
 const BME280_REG_GAS_ACD_LSB_RANGE: u8 = 0x2b;
 const BME280_REG_RANGE_SWITCHING_ERROR: u8 = 0x04;
@@ -92,6 +92,8 @@ const BME680_NB_CONV_NB_CONV_MASK: u8 = 0x0f;
 const BME680_NB_CONV_RUN_GAS_SHL: u8 = 4;
 const BME680_NB_CONV_RUN_GAS_MASK: u8 = 0xef;
 const BME680_GAS_WAIT_MULT_FACT_SHL: u8 = 6;
+const BME680_GAS_VALID_BIT: u8 = 0x20;
+const BME680_HEAT_STAB_BIT: u8 = 0x10;
 
 // -- list of gas ranges and corresponding constants used for the resistance calculation
 const GAS_RANGE_C1: [f64; 16] = [
@@ -309,6 +311,13 @@ pub struct Bme280MeasuringResult {
 }
 
 #[derive(Debug)]
+pub struct Bme280GasMeasuringResult {
+    pub gas_res: f64,
+    pub gas_valid: bool,
+    pub heat_stab: bool,
+}
+
+#[derive(Debug)]
 struct CalibData
 {
     // -- calibration coefficients for temperature
@@ -434,7 +443,7 @@ impl BME680 {
         let par_g2 = (i2cio::read_word(i2c, BME280_REG_CALIB_PAR_G2)? as i16) as f64;
         let par_g3 = (i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_G3)? as i8) as f64;
         let data_rh = i2cio::read_byte(i2c, BME280_REG_CALIB_RES_HEAT_CHANGE)?;
-        let res_heat_range = (data_rh >> BME680_4_BIT_SHIFT & BME680_2_BIT_MASK) as f64;
+        let res_heat_range = ((data_rh >> BME680_4_BIT_SHIFT) & BME680_2_BIT_MASK) as f64;
         let res_heat_val = (i2cio::read_byte(i2c, BME280_REG_CALIB_RES_HEAT_VAL)? as i8) as f64;
         let data_rse = i2cio::read_byte(i2c, BME280_REG_RANGE_SWITCHING_ERROR)?;
         let range_switching_error = ((data_rse  >> BME680_4_BIT_SHIFT) as i8) as f64;
@@ -504,16 +513,33 @@ impl BME680 {
     }
 
 
-    pub fn get_gas_meas_result(&mut self) -> Result<f64, std::io::Error> {
+    pub fn get_gas_meas_result(&mut self) -> Result<Bme280GasMeasuringResult, std::io::Error> {
         // -- read current value
         let data_msb = i2cio::read_byte(&mut self.i2c, BME280_REG_GAS_ACD_MSB)?;
         let data_lsb = i2cio::read_byte(&mut self.i2c, BME280_REG_GAS_ACD_LSB_RANGE)?;
         let gas_adc = ((data_msb << BME680_2_BIT_SHIFT) | (data_lsb >> BME680_6_BIT_SHIFT)) as f64;
-        let gas_range = (data_lsb & 0xf) as usize;
+        let gas_range = (data_lsb & BME680_4_BIT_MASK) as usize;
+        let gas_valid = (data_lsb & BME680_GAS_VALID_BIT) > 0;
+        let heat_stab = (data_lsb & BME680_HEAT_STAB_BIT) > 0;
         let range_switching_error = self.calib_data.range_switching_error;
-        let var1 = (1340.0 + 5.0 * range_switching_error) * GAS_RANGE_C1[gas_range];
+        let var1 = (1340.0 + (5.0 * range_switching_error)) * GAS_RANGE_C1[gas_range];
         let gas_res = var1 * GAS_RANGE_C2[gas_range] / (gas_adc - 512.0 + var1);
-        Ok(gas_res)
+        let result = Bme280GasMeasuringResult {
+            gas_res, gas_valid, heat_stab,
+        };
+        Ok(result)
+        // const LOOKUP_K1_RANGE: [f64; 16] = [
+        //     0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, -0.8, 0.0, 0.0, -0.2, -0.5, 0.0, -1.0, 0.0, 0.0,
+        // ];
+        // const LOOKUP_K2_RANGE: [f64; 16] = [
+        //     0.0, 0.0, 0.0, 0.0, 0.1, 0.7, 0.0, -0.8, -0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        // ];
+        // let gas_range_f = (1 << gas_range) as f64;
+        // let var1 = (1340.0 + (5.0 * range_switching_error));
+        // let var2 = var1 * (1.0 + LOOKUP_K1_RANGE[gas_range] / 100.0);
+        // let var3 = 1.0 + (LOOKUP_K2_RANGE[gas_range] / 100.0);
+        // let gas_res = 1.0 / (var3 * (0.000000125) * gas_range_f * (((gas_adc - 512.0) / var2) + 1.0));
+        // Ok(gas_res)
     }
 
     pub fn get_temperature(&self, temperature_raw: u32) -> (f64, f64) {
