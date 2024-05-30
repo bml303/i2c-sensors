@@ -80,6 +80,8 @@ const BME680_8_BIT_SHIFT: u8 = 8;
 const BME680_6_BIT_SHIFT: u8 = 6;
 const BME680_4_BIT_SHIFT: u8 = 4;
 const BME680_2_BIT_SHIFT: u8 = 2;
+const BME680_4_BIT_MASK: u8 = 0xf;
+const BME680_2_BIT_MASK: u8 = 0x2;
 const BME680_CTRL_MEAS_FORCED_MODE_BIT: u8 = 1;
 const BME680_CTRL_MEAS_PRESSURE_SHL: u8 = 2;
 const BME680_CTRL_MEAS_TEMPERATURE_SHL: u8 = 5;
@@ -330,6 +332,7 @@ struct CalibData
     par_g3: f64,
     res_heat_range: f64,
     res_heat_val: f64,
+    range_switching_error: f64,
     // -- calibration coefficients for humidity
     par_h1: f64,
     par_h2: f64,
@@ -413,43 +416,47 @@ impl BME680 {
     fn get_calib_data(i2c: &mut I2c<File>) -> Result<CalibData, std::io::Error> {
         // -- get calibration data for temperatire
         let par_t1 = i2cio::read_word(i2c, BME280_REG_CALIB_PAR_T1)? as f64;
-        let par_t2 = i2cio::read_word(i2c, BME280_REG_CALIB_PAR_T2)? as f64;
+        let par_t2 = (i2cio::read_word(i2c, BME280_REG_CALIB_PAR_T2)? as i16) as f64;
         let par_t3 = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_T3)? as f64;
         // -- get calibration data for pressure
         let par_p1 = i2cio::read_word(i2c, BME280_REG_CALIB_PAR_P1)? as f64;
-        let par_p2 = i2cio::read_word(i2c, BME280_REG_CALIB_PAR_P2)? as f64;
-        let par_p3 = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_P3)? as f64;
-        let par_p4 = i2cio::read_word(i2c, BME280_REG_CALIB_PAR_P4)? as f64;
-        let par_p5 = i2cio::read_word(i2c, BME280_REG_CALIB_PAR_P5)? as f64;
-        let par_p6 = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_P6)? as f64;
-        let par_p7 = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_P7)? as f64;
-        let par_p8 = i2cio::read_word(i2c, BME280_REG_CALIB_PAR_P8)? as f64;
-        let par_p9 = i2cio::read_word(i2c, BME280_REG_CALIB_PAR_P9)? as f64;
+        let par_p2 = (i2cio::read_word(i2c, BME280_REG_CALIB_PAR_P2)? as i16) as f64;
+        let par_p3 = (i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_P3)? as i8) as f64;
+        let par_p4 = (i2cio::read_word(i2c, BME280_REG_CALIB_PAR_P4)? as i16) as f64;
+        let par_p5 = (i2cio::read_word(i2c, BME280_REG_CALIB_PAR_P5)? as i16) as f64;
+        let par_p6 = (i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_P6)? as i8) as f64;
+        let par_p7 = (i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_P7)? as i8) as f64;
+        let par_p8 = (i2cio::read_word(i2c, BME280_REG_CALIB_PAR_P8)? as i16) as f64;
+        let par_p9 = (i2cio::read_word(i2c, BME280_REG_CALIB_PAR_P9)? as i16) as f64;
         let par_p10 = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_P10)? as f64;
         // -- get calibration data for gas
-        let par_g1 = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_G1)? as f64;
-        let par_g2 = i2cio::read_word(i2c, BME280_REG_CALIB_PAR_G2)? as f64;
-        let par_g3 = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_G3)? as f64;
-        let res_heat_range = (i2cio::read_byte(i2c, BME280_REG_CALIB_RES_HEAT_CHANGE)? >> BME680_4_BIT_SHIFT & 0b11) as f64;
+        let par_g1 = (i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_G1)? as i8) as f64;
+        let par_g2 = (i2cio::read_word(i2c, BME280_REG_CALIB_PAR_G2)? as i16) as f64;
+        let par_g3 = (i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_G3)? as i8) as f64;
+        let data_rh = i2cio::read_byte(i2c, BME280_REG_CALIB_RES_HEAT_CHANGE)?;
+        let res_heat_range = (data_rh >> BME680_4_BIT_SHIFT & BME680_2_BIT_MASK) as f64;
         let res_heat_val = (i2cio::read_byte(i2c, BME280_REG_CALIB_RES_HEAT_VAL)? as i8) as f64;
+        let data_rse = i2cio::read_byte(i2c, BME280_REG_RANGE_SWITCHING_ERROR)?;
+        let range_switching_error = ((data_rse  >> BME680_4_BIT_SHIFT) as i8) as f64;
         // -- get calibration data for humidity
         let data_msb = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H1)?;
-        let data_lsb = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H1_H2)? & 0x0f;
+        let data_lsb = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H1_H2)? & BME680_4_BIT_MASK;
         let par_h1 = ((data_msb as u16) << BME680_4_BIT_SHIFT | data_lsb as u16) as f64;
         let data_msb = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H2)?;
         let data_lsb = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H1_H2)? >> BME680_4_BIT_SHIFT;
         let par_h2 = ((data_msb as u16) << BME680_4_BIT_SHIFT | data_lsb as u16) as f64;
-        let par_h3 = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H3)? as f64;
-        let par_h4 = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H4)? as f64;
-        let par_h5 = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H5)? as f64;
+        let par_h3 = (i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H3)? as i8) as f64;
+        let par_h4 = (i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H4)? as i8) as f64;
+        let par_h5 = (i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H5)? as i8) as f64;
         let par_h6 = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H6)? as f64;
-        let par_h7 = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H7)? as f64;
+        let par_h7 = (i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H7)? as i8) as f64;
         // -- return structured calibration data
         Ok(CalibData {
             par_t1, par_t2, par_t3,
             par_p1, par_p2, par_p3, par_p4, par_p5, 
             par_p6, par_p7, par_p8, par_p9, par_p10,
-            par_g1, par_g2, par_g3, res_heat_range, res_heat_val,
+            par_g1, par_g2, par_g3, res_heat_range, 
+            res_heat_val, range_switching_error,
             par_h1, par_h2, par_h3, par_h4, par_h5, 
             par_h6, par_h7,
         })
@@ -503,8 +510,7 @@ impl BME680 {
         let data_lsb = i2cio::read_byte(&mut self.i2c, BME280_REG_GAS_ACD_LSB_RANGE)?;
         let gas_adc = ((data_msb << BME680_2_BIT_SHIFT) | (data_lsb >> BME680_6_BIT_SHIFT)) as f64;
         let gas_range = (data_lsb & 0xf) as usize;
-        let data_rse = i2cio::read_byte(&mut self.i2c, BME280_REG_RANGE_SWITCHING_ERROR)?;
-        let range_switching_error = ((data_rse  >> BME680_4_BIT_SHIFT) as i8) as f64;
+        let range_switching_error = self.calib_data.range_switching_error;
         let var1 = (1340.0 + 5.0 * range_switching_error) * GAS_RANGE_C1[gas_range];
         let gas_res = var1 * GAS_RANGE_C2[gas_range] / (gas_adc - 512.0 + var1);
         Ok(gas_res)
