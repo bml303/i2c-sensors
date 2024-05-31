@@ -84,18 +84,17 @@ fn main() -> ExitCode {
     let chip_id = bme680.get_chip_id();
     info!("Got chip id {chip_id:#04x}");    
     
-
     // -- assume ambient temperature for first run, then use measured value
+    const BURN_IN_CYCLES: u64 = 360;
+    const BURN_IN_DELAY_SEC: u64 = 1;
     const MEASURING_DELAY_SEC: u64 = 5;
-    const BURN_IN_CYCLES: u64 = 100;
-    let mut ambient_temp = 20.0;
     const PH_SLOPE: f64 = 0.01;
-    let mut burn_in_cycles = BURN_IN_CYCLES / MEASURING_DELAY_SEC;
+    let mut ambient_temp = 20.0;
+    let mut burn_in_cycles = BURN_IN_CYCLES;
     let mut gas_cal_data: VecDeque<f64> = VecDeque::new();
     let mut gas_ceil = 0.0;
-    const GAS_RECAL_PERIOD: usize = 3600 / MEASURING_DELAY_SEC as usize;
+    const GAS_RECAL_PERIOD: usize = 360; // / MEASURING_DELAY_SEC as usize;
     let mut gas_recal_step: usize = 0;
-    let mut aq_data: VecDeque<f64> = VecDeque::new();
 
     loop {
 
@@ -155,6 +154,7 @@ fn main() -> ExitCode {
             }
         };
         info!("Got measuring result {result:#?}");
+        
         // -- get compensated values
         let (temperature, t_fine) = bme680.get_temperature(result.temperature_raw);
         info!("Got compensated temperature {temperature} with t_fine {t_fine}");
@@ -174,9 +174,10 @@ fn main() -> ExitCode {
 
         // -- store ambient temperature for next loop
         ambient_temp = temperature;
-
         if !(gas_result.gas_valid && gas_result.heat_stab) {
             // -- skip measurement if not valid or heater not stable (or both)
+            let measuring_delay = time::Duration::from_millis(MEASURING_DELAY_SEC * 1000);
+            thread::sleep(measuring_delay);
             continue
         }
 
@@ -186,40 +187,40 @@ fn main() -> ExitCode {
         let hum_abs = humidity * 10.0 * rho_max;
         // -- compensate exponential impact of humidity on resistance
 		let comp_gas = gas_result.gas_res * (PH_SLOPE * hum_abs).exp();
-
         // -- burn-in or not 
         if burn_in_cycles > 0 {
             burn_in_cycles -= 1;
             if comp_gas > gas_ceil {
-                gas_cal_data.clear();   
-                gas_cal_data.push_front(comp_gas);
+                //gas_cal_data.clear();   
+                gas_cal_data.push_back(comp_gas);
+                while gas_cal_data.len() > 5 {
+                    gas_cal_data.pop_front();
+                }
                 gas_ceil = comp_gas;
             }
-            info!("Burn-in cycle {burn_in_cycles}: gas_ceil {gas_ceil}")
+            info!("Burn-in cycle {burn_in_cycles}: gas_ceil {gas_ceil}");
+            // -- delay next measuring
+            let measuring_delay = time::Duration::from_millis(BURN_IN_DELAY_SEC * 1000);
+            thread::sleep(measuring_delay);
+            continue
         } else {
             // -- adapt calibration
 			if comp_gas > gas_ceil {
 				gas_cal_data.push_back(comp_gas);
-				if gas_cal_data.len() > 100 {
+				while gas_cal_data.len() > 50 {
                     gas_cal_data.pop_front();
                 }
                 gas_ceil = calc_mean(&gas_cal_data);
             }
 
             // -- calculate and print relative air quality on a scale of 0-100%
-			// -- use quadratic ratio for steeper scaling at high air quality
-			// -- clip air quality at 100%
-
             let aqr = comp_gas / gas_ceil;
-			let aq = (aqr.powi(2)).min(1.0) * 100.0;
-            aq_data.push_back(aq);
-            while aq_data.len() > 10 {
-                aq_data.pop_front();
-            }
-            let aq = calc_mean(&aq_data);
+            // -- clip air quality at 100%
+            let aq = aqr.min(1.0) * 100.0;
+            // -- use quadratic ratio for steeper scaling at high air quality
+			//let aq = (aqr.powi(2)).min(1.0) * 100.0;
             let aqi = (1.0 - (aq / 100.0)) * 500.0;
-            info!("AQR {aqr}, Air Quality Index {aqi}, AQ {aq}%, comp_gas {comp_gas}, aq_data len {}", aq_data.len());
-
+            info!("AQR {aqr}, Air Quality Index {aqi}, AQ {aq}%, comp_gas {comp_gas}");
 
             // -- for compensating negative drift (dropping resistance) of the gas sensor:
 			// -- delete oldest value from calibration list and add current value
@@ -227,7 +228,9 @@ fn main() -> ExitCode {
 			if gas_recal_step >= GAS_RECAL_PERIOD {
                 gas_recal_step = 0;
 				gas_cal_data.push_back(comp_gas);
-                gas_cal_data.pop_front();
+                while gas_cal_data.len() > 50 {
+                    gas_cal_data.pop_front();
+                }
                 gas_ceil = calc_mean(&gas_cal_data);
             }
         }

@@ -12,57 +12,140 @@ use crate::i2cio;
 const BME680_CHIP_ID: u8 = 0x61;
 
 // -- control, status and result registers
-const BME280_REG_MEAS_STATUS_0: u8 = 0x1d;
-const BME280_REG_MEAS_RESULT_BASE: u8 = 0x1f;
+const BME680_REG_MEAS_STATUS_0: u8 = 0x1d;
+const BME680_REG_MEAS_RESULT_BASE: u8 = 0x1f;
 #[allow(dead_code)]
-const BME280_REG_IDAC_HEAT_BASE: u8 = 0x50;
-const BME280_REG_RES_HEAT_BASE: u8 = 0x5a;
-const BME280_REG_GAS_WAIT_BASE: u8 = 0x64;
-const BME280_REG_GAS_ACD_MSB: u8 = 0x2a;
-const BME280_REG_GAS_ACD_LSB_RANGE: u8 = 0x2b;
-const BME280_REG_RANGE_SWITCHING_ERROR: u8 = 0x04;
-const BME280_REG_CONFIG: u8 = 0x75;
-const BME280_REG_CTRL_GAS_0: u8 = 0x70;
-const BME280_REG_CTRL_GAS_1: u8 = 0x71;
-const BME280_REG_CTRL_HUM: u8 = 0x72;
-const BME280_REG_CTRL_MEAS: u8 = 0x74;
+const BME680_REG_IDAC_HEAT_BASE: u8 = 0x50;
+const BME680_REG_RES_HEAT_BASE: u8 = 0x5a;
+const BME680_REG_GAS_WAIT_BASE: u8 = 0x64;
+const BME680_REG_GAS_ACD_MSB: u8 = 0x2a;
+const BME680_REG_GAS_ACD_LSB_RANGE: u8 = 0x2b;
+const BME680_REG_RANGE_SWITCHING_ERROR: u8 = 0x04;
+const BME680_REG_CONFIG: u8 = 0x75;
+const BME680_REG_CTRL_GAS_0: u8 = 0x70;
+const BME680_REG_CTRL_GAS_1: u8 = 0x71;
+const BME680_REG_CTRL_HUM: u8 = 0x72;
+const BME680_REG_CTRL_MEAS: u8 = 0x74;
 const BME680_REG_CHIP_ID: u8 = 0xd0;
-const BME280_REG_RESET: u8 = 0xe0;
+const BME680_REG_RESET: u8 = 0xe0;
 
 // -- registers for calibration data
-const BME280_REG_CALIB_PAR_T1: u8 = 0xe9;
-const BME280_REG_CALIB_PAR_T2: u8 = 0x8a;
-const BME280_REG_CALIB_PAR_T3: u8 = 0x8c;
-const BME280_REG_CALIB_PAR_P1: u8 = 0x8e;
-const BME280_REG_CALIB_PAR_P2: u8 = 0x90;
-const BME280_REG_CALIB_PAR_P3: u8 = 0x92;
-const BME280_REG_CALIB_PAR_P4: u8 = 0x94;
-const BME280_REG_CALIB_PAR_P5: u8 = 0x96;
-const BME280_REG_CALIB_PAR_P6: u8 = 0x99;
-const BME280_REG_CALIB_PAR_P7: u8 = 0x98;
-const BME280_REG_CALIB_PAR_P8: u8 = 0x9c;
-const BME280_REG_CALIB_PAR_P9: u8 = 0x9e;
-const BME280_REG_CALIB_PAR_P10: u8 = 0xa0;
-const BME280_REG_CALIB_PAR_G1: u8 = 0xed;
-const BME280_REG_CALIB_PAR_G2: u8 = 0xeb;
-const BME280_REG_CALIB_PAR_G3: u8 = 0xee;
-const BME280_REG_CALIB_RES_HEAT_CHANGE: u8 = 0x02;
-const BME280_REG_CALIB_RES_HEAT_VAL: u8 = 0x00;
-const BME280_REG_CALIB_PAR_H1: u8 = 0xe3;
-const BME280_REG_CALIB_PAR_H1_H2: u8 = 0xe2;
-const BME280_REG_CALIB_PAR_H2: u8 = 0xe1;
-const BME280_REG_CALIB_PAR_H3: u8 = 0xe4;
-const BME280_REG_CALIB_PAR_H4: u8 = 0xe5;
-const BME280_REG_CALIB_PAR_H5: u8 = 0xe6;
-const BME280_REG_CALIB_PAR_H6: u8 = 0xe7;
-const BME280_REG_CALIB_PAR_H7: u8 = 0xe8;
+const BME680_REG_CALIB_DATA1_BASE: u8 = 0x8a;
+const BME680_REG_CALIB_DATA2_BASE: u8 = 0xe1;
+const BME680_REG_CALIB_DATA3_BASE: u8 = 0x00;
+
+const BME680_CALIB_DATA1_LEN: usize = 23;
+const BME680_CALIB_DATA2_LEN: usize = 14;
+const BME680_CALIB_DATA3_LEN: usize = 5;
+
+// -- Coefficient T2 LSB position
+const BME680_IDX_T2_LSB: usize = 0;
+// -- Coefficient T2 MSB position
+const BME680_IDX_T2_MSB: usize = 1;
+// -- Coefficient T3 position
+const BME680_IDX_T3: usize = 2;
+// -- Coefficient P1 LSB position
+const BME68X_IDX_P1_LSB: usize = 4;
+// -- Coefficient P1 MSB position
+const BME68X_IDX_P1_MSB: usize = 5;
+// -- Coefficient P2 LSB position
+const BME68X_IDX_P2_LSB: usize = 6;
+// -- Coefficient P2 MSB position
+const BME68X_IDX_P2_MSB: usize = 7;
+// -- Coefficient P3 position
+const BME68X_IDX_P3: usize = 8;
+// -- Coefficient P4 LSB position
+const BME68X_IDX_P4_LSB: usize = 10;
+// -- Coefficient P4 MSB position
+const BME68X_IDX_P4_MSB: usize = 11;
+// -- Coefficient P5 LSB position
+const BME68X_IDX_P5_LSB: usize = 12;
+// -- Coefficient P5 MSB position
+const BME68X_IDX_P5_MSB: usize = 13;
+// -- Coefficient P7 position
+const BME68X_IDX_P7: usize = 14;
+// -- Coefficient P6 position
+const BME68X_IDX_P6: usize = 15;
+// -- Coefficient P8 LSB position
+const BME68X_IDX_P8_LSB: usize = 18;
+// -- Coefficient P8 MSB position
+const BME68X_IDX_P8_MSB: usize = 19;
+// -- Coefficient P9 LSB position
+const BME68X_IDX_P9_LSB: usize = 20;
+// -- Coefficient P9 MSB position
+const BME68X_IDX_P9_MSB: usize = 21;
+// -- Coefficient P10 position
+const BME68X_IDX_P10: usize = 22;
+// -- Coefficient H2 MSB position
+const BME68X_IDX_H2_MSB: usize = 23;
+// -- Coefficient H2 LSB position
+const BME68X_IDX_H2_LSB: usize = 24;
+// -- Coefficient H1 LSB position
+const BME68X_IDX_H1_LSB: usize = 24;
+// -- Coefficient H1 MSB position
+const BME68X_IDX_H1_MSB: usize = 25;
+// -- Coefficient H3 position
+const BME68X_IDX_H3: usize = 26;
+// -- Coefficient H4 position
+const BME68X_IDX_H4: usize = 27;
+// -- Coefficient H5 position
+const BME68X_IDX_H5: usize = 28;
+// -- Coefficient H6 position
+const BME68X_IDX_H6: usize = 29;
+// -- Coefficient H7 position
+const BME68X_IDX_H7: usize = 30;
+// -- Coefficient T1 LSB position
+const BME680_IDX_T1_LSB: usize = 31;
+// -- Coefficient T1 MSB position
+const BME680_IDX_T1_MSB: usize = 32;
+// -- Coefficient GH2 LSB position
+const BME68X_IDX_GH2_LSB: usize = 33;
+// -- Coefficient GH2 MSB position
+const BME68X_IDX_GH2_MSB: usize = 34;
+// -- Coefficient GH1 position
+const BME68X_IDX_GH1: usize = 35;
+// -- Coefficient GH3 position
+const BME68X_IDX_GH3: usize = 36;
+// -- Coefficient res heat value position
+const BME68X_IDX_RES_HEAT_VAL: usize = 37;
+// -- Coefficient res heat range position
+const BME68X_IDX_RES_HEAT_RANGE: usize = 39;
+// -- Coefficient range switching error position
+const BME68X_IDX_RANGE_SW_ERR: usize = 41;
+
+const BME680_REG_CALIB_PAR_T1: u8 = 0xe9;
+const BME680_REG_CALIB_PAR_T2: u8 = 0x8a;
+const BME680_REG_CALIB_PAR_T3: u8 = 0x8c;
+const BME680_REG_CALIB_PAR_P1: u8 = 0x8e;
+const BME680_REG_CALIB_PAR_P2: u8 = 0x90;
+const BME680_REG_CALIB_PAR_P3: u8 = 0x92;
+const BME680_REG_CALIB_PAR_P4: u8 = 0x94;
+const BME680_REG_CALIB_PAR_P5: u8 = 0x96;
+const BME680_REG_CALIB_PAR_P6: u8 = 0x99;
+const BME680_REG_CALIB_PAR_P7: u8 = 0x98;
+const BME680_REG_CALIB_PAR_P8: u8 = 0x9c;
+const BME680_REG_CALIB_PAR_P9: u8 = 0x9e;
+const BME680_REG_CALIB_PAR_P10: u8 = 0xa0;
+const BME680_REG_CALIB_PAR_GH1: u8 = 0xed;
+const BME680_REG_CALIB_PAR_GH2: u8 = 0xeb;
+const BME680_REG_CALIB_PAR_GH3: u8 = 0xee;
+const BME680_REG_CALIB_RES_HEAT_CHANGE: u8 = 0x02;
+const BME680_REG_CALIB_RES_HEAT_VAL: u8 = 0x00;
+const BME680_REG_CALIB_PAR_H1: u8 = 0xe3;
+const BME680_REG_CALIB_PAR_H1_H2: u8 = 0xe2;
+const BME680_REG_CALIB_PAR_H2: u8 = 0xe1;
+const BME680_REG_CALIB_PAR_H3: u8 = 0xe4;
+const BME680_REG_CALIB_PAR_H4: u8 = 0xe5;
+const BME680_REG_CALIB_PAR_H5: u8 = 0xe6;
+const BME680_REG_CALIB_PAR_H6: u8 = 0xe7;
+const BME680_REG_CALIB_PAR_H7: u8 = 0xe8;
 
 // -- length values for block reads
-const BME280_MEAS_RESULT_LEN: usize = 8;
+const BME680_MEAS_RESULT_LEN: usize = 8;
 #[allow(dead_code)]
-const BME280_IDAC_HEAT_BASE_LEN: usize = 10;
-const BME280_RES_HEAT_BASE_LEN: usize = 10;
-const BME280_GAS_WAIT_BASE_LEN: usize = 10;
+const BME680_IDAC_HEAT_BASE_LEN: usize = 10;
+const BME680_RES_HEAT_BASE_LEN: usize = 10;
+const BME680_GAS_WAIT_BASE_LEN: usize = 10;
 
 // -- mask and bits for meas_status_0 register
 const BME680_MEAS_STATUS_0_NEW_DATA_BIT: u8 = 0x80;
@@ -91,6 +174,9 @@ const BME680_CTRL_GAS_0_HEATER_SHL: u8 = 3;
 const BME680_NB_CONV_NB_CONV_MASK: u8 = 0x0f;
 const BME680_NB_CONV_RUN_GAS_SHL: u8 = 4;
 const BME680_NB_CONV_RUN_GAS_MASK: u8 = 0xef;
+const BME680_BIT_H1_DATA_MASK: u8 = 0x0f;
+const BME680_RHRANGE_MASK: u8 = 0x30;               // -- Mask for res heat range
+const BME68X_RSERROR_MASK: u8 = 0xf0;               // -- Mask for range switching error
 const BME680_GAS_WAIT_MULT_FACT_SHL: u8 = 6;
 const BME680_GAS_VALID_BIT: u8 = 0x20;
 const BME680_HEAT_STAB_BIT: u8 = 0x10;
@@ -210,21 +296,21 @@ pub enum Bme680IrrFilter {
 }
 
 impl Bme680IrrFilter {
-    const BME280_FILTER_COEFF_OFF: u8 = 0x00;
-    const BME280_FILTER_COEFF_3: u8 = 0x02;
-    const BME280_FILTER_COEFF_7: u8 = 0x03;
-    const BME280_FILTER_COEFF_31: u8 = 0x05;
-    const BME280_FILTER_COEFF_63: u8 = 0x06;
-    const BME280_FILTER_COEFF_127: u8 = 0x07;
+    const BME680_FILTER_COEFF_OFF: u8 = 0x00;
+    const BME680_FILTER_COEFF_3: u8 = 0x02;
+    const BME680_FILTER_COEFF_7: u8 = 0x03;
+    const BME680_FILTER_COEFF_31: u8 = 0x05;
+    const BME680_FILTER_COEFF_63: u8 = 0x06;
+    const BME680_FILTER_COEFF_127: u8 = 0x07;
 
     fn value(&self) -> u8 {
         match *self {
-            Self::FilterOff => Self::BME280_FILTER_COEFF_OFF,
-            Self::Coef3 => Self::BME280_FILTER_COEFF_3,
-            Self::Coef7 => Self::BME280_FILTER_COEFF_7,
-            Self::Coef31 => Self::BME280_FILTER_COEFF_31,
-            Self::Coef63 => Self::BME280_FILTER_COEFF_63,
-            Self::Coef127 => Self::BME280_FILTER_COEFF_127,
+            Self::FilterOff => Self::BME680_FILTER_COEFF_OFF,
+            Self::Coef3 => Self::BME680_FILTER_COEFF_3,
+            Self::Coef7 => Self::BME680_FILTER_COEFF_7,
+            Self::Coef31 => Self::BME680_FILTER_COEFF_31,
+            Self::Coef63 => Self::BME680_FILTER_COEFF_63,
+            Self::Coef127 => Self::BME680_FILTER_COEFF_127,
         }
     }
 }
@@ -296,7 +382,7 @@ impl Bme680GasWaitMultiplicationFactor {
 }
 
 #[derive(Debug)]
-pub struct Bme280MeasuringStatus {
+pub struct Bme680MeasuringStatus {
     pub new_data: bool,
     pub gas_measuring: bool,
     pub measuring: bool,
@@ -304,14 +390,14 @@ pub struct Bme280MeasuringStatus {
 }
 
 #[derive(Debug)]
-pub struct Bme280MeasuringResult {
+pub struct Bme680MeasuringResult {
     pub pressure_raw: u32,
     pub temperature_raw: u32,
     pub humidity_raw: u16,
 }
 
 #[derive(Debug)]
-pub struct Bme280GasMeasuringResult {
+pub struct Bme680GasMeasuringResult {
     pub gas_res: f64,
     pub gas_valid: bool,
     pub heat_stab: bool,
@@ -336,12 +422,12 @@ struct CalibData
     par_p9: f64,
     par_p10: f64,
     // -- calibration coefficients for gas
-    par_g1: f64,
-    par_g2: f64,
-    par_g3: f64,
+    par_gh1: f64,
+    par_gh2: f64,
+    par_gh3: f64,
     res_heat_range: f64,
     res_heat_val: f64,
-    range_switching_error: f64,
+    range_sw_err: f64,
     // -- calibration coefficients for humidity
     par_h1: f64,
     par_h2: f64,
@@ -412,7 +498,7 @@ impl BME680 {
     }
 
     pub fn soft_reset(&mut self) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_RESET;
+        const REG: u8 = BME680_REG_RESET;
         // -- initiate soft reset
         debug!("Initiating soft reset");
         i2cio::write_byte(&mut self.i2c, REG, BME680_COMMAND_SOFT_RESET)?;
@@ -422,57 +508,130 @@ impl BME680 {
         Ok(())
     }
 
+    fn concat_bytes(msb: u8, lsb: u8) -> u16 {
+        ((msb as u16) << 8) | (lsb as u16)
+    }
+
     fn get_calib_data(i2c: &mut I2c<File>) -> Result<CalibData, std::io::Error> {
+        // -- read calibration data block 1
+        const REG_1: u8 = BME680_REG_CALIB_DATA1_BASE;
+        const LEN_1: usize = BME680_CALIB_DATA1_LEN;
+        let mut reg_data_1: [u8; LEN_1] = [0; LEN_1];
+        let _bytes_read = i2c.i2c_read_block_data(REG_1, &mut reg_data_1)?;
+        debug!("Read {_bytes_read} bytes of calibration data, block 1");
+        // -- read calibration data block 2
+        const REG_2: u8 = BME680_REG_CALIB_DATA2_BASE;
+        const LEN_2: usize = BME680_CALIB_DATA2_LEN;
+        let mut reg_data_2: [u8; LEN_2] = [0; LEN_2];
+        let _bytes_read = i2c.i2c_read_block_data(REG_2, &mut reg_data_2)?;
+        debug!("Read {_bytes_read} bytes of calibration data, block 2");
+        // -- read calibration data block 3
+        const REG_3: u8 = BME680_REG_CALIB_DATA3_BASE;
+        const LEN_3: usize = BME680_CALIB_DATA3_LEN;
+        let mut reg_data_3: [u8; LEN_3] = [0; LEN_3];
+        let _bytes_read = i2c.i2c_read_block_data(REG_3, &mut reg_data_3)?;
+        debug!("Read {_bytes_read} bytes of calibration data, block 3");
+        // -- concat arrays
+        let coeff_array = [reg_data_1.as_slice(), reg_data_2.as_slice(), reg_data_3.as_slice()].concat();
+
         // -- get calibration data for temperatire
-        let par_t1 = i2cio::read_word(i2c, BME280_REG_CALIB_PAR_T1)? as f64;
-        let par_t2 = (i2cio::read_word(i2c, BME280_REG_CALIB_PAR_T2)? as i16) as f64;
-        let par_t3 = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_T3)? as f64;
+        let par_t1 = Self::concat_bytes(coeff_array[BME680_IDX_T1_MSB], coeff_array[BME680_IDX_T1_LSB]) as f64;
+        let par_t2 = Self::concat_bytes(coeff_array[BME680_IDX_T2_MSB], coeff_array[BME680_IDX_T2_LSB]) as f64;
+        let par_t3 = coeff_array[BME680_IDX_T3] as f64;
+        debug!("Read {par_t1} {par_t2} {par_t3} ");
+        // -- OLD get calibration data for temperatire
+        let par_t1_ = i2cio::read_word(i2c, BME680_REG_CALIB_PAR_T1)? as f64;
+        let par_t2_ = (i2cio::read_word(i2c, BME680_REG_CALIB_PAR_T2)? as i16) as f64;
+        let par_t3_ = i2cio::read_byte(i2c, BME680_REG_CALIB_PAR_T3)? as f64;
+        debug!("Read {par_t1_} {par_t2_} {par_t3_} ");
+
         // -- get calibration data for pressure
-        let par_p1 = i2cio::read_word(i2c, BME280_REG_CALIB_PAR_P1)? as f64;
-        let par_p2 = (i2cio::read_word(i2c, BME280_REG_CALIB_PAR_P2)? as i16) as f64;
-        let par_p3 = (i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_P3)? as i8) as f64;
-        let par_p4 = (i2cio::read_word(i2c, BME280_REG_CALIB_PAR_P4)? as i16) as f64;
-        let par_p5 = (i2cio::read_word(i2c, BME280_REG_CALIB_PAR_P5)? as i16) as f64;
-        let par_p6 = (i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_P6)? as i8) as f64;
-        let par_p7 = (i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_P7)? as i8) as f64;
-        let par_p8 = (i2cio::read_word(i2c, BME280_REG_CALIB_PAR_P8)? as i16) as f64;
-        let par_p9 = (i2cio::read_word(i2c, BME280_REG_CALIB_PAR_P9)? as i16) as f64;
-        let par_p10 = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_P10)? as f64;
-        // -- get calibration data for gas
-        let par_g1 = (i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_G1)? as i8) as f64;
-        let par_g2 = (i2cio::read_word(i2c, BME280_REG_CALIB_PAR_G2)? as i16) as f64;
-        let par_g3 = (i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_G3)? as i8) as f64;
-        let data_rh = i2cio::read_byte(i2c, BME280_REG_CALIB_RES_HEAT_CHANGE)?;
-        let res_heat_range = ((data_rh >> BME680_4_BIT_SHIFT) & BME680_2_BIT_MASK) as f64;
-        let res_heat_val = (i2cio::read_byte(i2c, BME280_REG_CALIB_RES_HEAT_VAL)? as i8) as f64;
-        let data_rse = i2cio::read_byte(i2c, BME280_REG_RANGE_SWITCHING_ERROR)?;
-        let range_switching_error = ((data_rse  >> BME680_4_BIT_SHIFT) as i8) as f64;
+        let par_p1 = Self::concat_bytes(coeff_array[BME68X_IDX_P1_MSB], coeff_array[BME68X_IDX_P1_LSB]) as f64;
+        let par_p2 = (Self::concat_bytes(coeff_array[BME68X_IDX_P2_MSB], coeff_array[BME68X_IDX_P2_LSB]) as i16) as f64;
+        let par_p3 = (coeff_array[BME68X_IDX_P3] as i8) as f64;
+        let par_p4 = (Self::concat_bytes(coeff_array[BME68X_IDX_P4_MSB], coeff_array[BME68X_IDX_P4_LSB]) as i16) as f64;
+        let par_p5 = (Self::concat_bytes(coeff_array[BME68X_IDX_P5_MSB], coeff_array[BME68X_IDX_P5_LSB]) as i16) as f64;
+        let par_p6 = (coeff_array[BME68X_IDX_P6] as i8) as f64;
+        let par_p7 = (coeff_array[BME68X_IDX_P7] as i8) as f64;
+        let par_p8 = (Self::concat_bytes(coeff_array[BME68X_IDX_P8_MSB], coeff_array[BME68X_IDX_P8_LSB]) as i16) as f64;
+        let par_p9 = (Self::concat_bytes(coeff_array[BME68X_IDX_P9_MSB], coeff_array[BME68X_IDX_P9_LSB]) as i16) as f64;
+        let par_p10 = coeff_array[BME68X_IDX_P10] as f64;
+        debug!("Read {par_p1} {par_p2} {par_p3} {par_p4} {par_p5} {par_p6} {par_p7} {par_p8} {par_p9} {par_p10}");
+
+        // -- OLD: get calibration data for pressure
+        let par_p1_ = i2cio::read_word(i2c, BME680_REG_CALIB_PAR_P1)? as f64;
+        let par_p2_ = (i2cio::read_word(i2c, BME680_REG_CALIB_PAR_P2)? as i16) as f64;
+        let par_p3_ = (i2cio::read_byte(i2c, BME680_REG_CALIB_PAR_P3)? as i8) as f64;
+        let par_p4_ = (i2cio::read_word(i2c, BME680_REG_CALIB_PAR_P4)? as i16) as f64;
+        let par_p5_ = (i2cio::read_word(i2c, BME680_REG_CALIB_PAR_P5)? as i16) as f64;
+        let par_p6_ = (i2cio::read_byte(i2c, BME680_REG_CALIB_PAR_P6)? as i8) as f64;
+        let par_p7_ = (i2cio::read_byte(i2c, BME680_REG_CALIB_PAR_P7)? as i8) as f64;
+        let par_p8_ = (i2cio::read_word(i2c, BME680_REG_CALIB_PAR_P8)? as i16) as f64;
+        let par_p9_ = (i2cio::read_word(i2c, BME680_REG_CALIB_PAR_P9)? as i16) as f64;
+        let par_p10_ = i2cio::read_byte(i2c, BME680_REG_CALIB_PAR_P10)? as f64;
+        debug!("Read {par_p1_} {par_p2_} {par_p3_} {par_p4_} {par_p5_} {par_p6_} {par_p7_} {par_p8_} {par_p9_} {par_p10_}");
+
         // -- get calibration data for humidity
-        let data_msb = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H1)?;
-        let data_lsb = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H1_H2)? & BME680_4_BIT_MASK;
-        let par_h1 = ((data_msb as u16) << BME680_4_BIT_SHIFT | data_lsb as u16) as f64;
-        let data_msb = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H2)?;
-        let data_lsb = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H1_H2)? >> BME680_4_BIT_SHIFT;
-        let par_h2 = ((data_msb as u16) << BME680_4_BIT_SHIFT | data_lsb as u16) as f64;
-        let par_h3 = (i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H3)? as i8) as f64;
-        let par_h4 = (i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H4)? as i8) as f64;
-        let par_h5 = (i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H5)? as i8) as f64;
-        let par_h6 = i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H6)? as f64;
-        let par_h7 = (i2cio::read_byte(i2c, BME280_REG_CALIB_PAR_H7)? as i8) as f64;
+        let par_h1 = (((coeff_array[BME68X_IDX_H1_MSB] as u16) << 4) |
+                        ((coeff_array[BME68X_IDX_H1_LSB] & BME680_BIT_H1_DATA_MASK) as u16)) as f64;
+        let par_h2 = (((coeff_array[BME68X_IDX_H2_MSB] as u16) << 4) | 
+                        ((coeff_array[BME68X_IDX_H2_LSB] >> 4) as u16)) as f64;
+        let par_h3 = (coeff_array[BME68X_IDX_H3] as i8) as f64;
+        let par_h4 = (coeff_array[BME68X_IDX_H4] as i8) as f64;
+        let par_h5 = (coeff_array[BME68X_IDX_H5] as i8) as f64;
+        let par_h6 = coeff_array[BME68X_IDX_H6] as f64;
+        let par_h7 = (coeff_array[BME68X_IDX_H7] as i8) as f64;
+        debug!("Read {par_h1} {par_h2} {par_h3} {par_h4} {par_h5} {par_h6} {par_h7}");
+        
+        // -- OLD: get calibration data for humidity
+        let data_msb = i2cio::read_byte(i2c, BME680_REG_CALIB_PAR_H1)?;
+        let data_lsb = i2cio::read_byte(i2c, BME680_REG_CALIB_PAR_H1_H2)? & BME680_4_BIT_MASK;
+        let par_h1_ = ((data_msb as u16) << BME680_4_BIT_SHIFT | data_lsb as u16) as f64;
+        let data_msb = i2cio::read_byte(i2c, BME680_REG_CALIB_PAR_H2)?;
+        let data_lsb = i2cio::read_byte(i2c, BME680_REG_CALIB_PAR_H1_H2)? >> BME680_4_BIT_SHIFT;
+        let par_h2_ = ((data_msb as u16) << BME680_4_BIT_SHIFT | data_lsb as u16) as f64;
+        let par_h3_ = (i2cio::read_byte(i2c, BME680_REG_CALIB_PAR_H3)? as i8) as f64;
+        let par_h4_ = (i2cio::read_byte(i2c, BME680_REG_CALIB_PAR_H4)? as i8) as f64;
+        let par_h5_ = (i2cio::read_byte(i2c, BME680_REG_CALIB_PAR_H5)? as i8) as f64;
+        let par_h6_ = i2cio::read_byte(i2c, BME680_REG_CALIB_PAR_H6)? as f64;
+        let par_h7_ = (i2cio::read_byte(i2c, BME680_REG_CALIB_PAR_H7)? as i8) as f64;
+        debug!("Read {par_h1_} {par_h2_} {par_h3_} {par_h4_} {par_h5_} {par_h6_} {par_h7_}");
+
+        // -- get calibration data related to gas heater  
+        let par_gh1 = (coeff_array[BME68X_IDX_GH1] as i8) as f64;
+        let par_gh2 = (Self::concat_bytes(coeff_array[BME68X_IDX_GH2_MSB], coeff_array[BME68X_IDX_GH2_LSB]) as i16) as f64;
+        let par_gh3 = (coeff_array[BME68X_IDX_GH3] as i8) as f64;
+        let res_heat_range = ((coeff_array[BME68X_IDX_RES_HEAT_RANGE] & BME680_RHRANGE_MASK) / 16) as f64;
+        let res_heat_val = (coeff_array[BME68X_IDX_RES_HEAT_VAL] as i8) as f64;
+        let range_sw_err = (((coeff_array[BME68X_IDX_RANGE_SW_ERR] & BME68X_RSERROR_MASK) as i8) / 16) as f64;
+        debug!("Read {par_gh1} {par_gh2} {par_gh3} {res_heat_range} {res_heat_val} {range_sw_err}");
+
+        // -- OLD get calibration data for gas
+        let par_gh1_ = (i2cio::read_byte(i2c, BME680_REG_CALIB_PAR_GH1)? as i8) as f64;
+        let par_gh2_ = (i2cio::read_word(i2c, BME680_REG_CALIB_PAR_GH2)? as i16) as f64;
+        let par_gh3_ = (i2cio::read_byte(i2c, BME680_REG_CALIB_PAR_GH3)? as i8) as f64;
+        let data_rh_ = i2cio::read_byte(i2c, BME680_REG_CALIB_RES_HEAT_CHANGE)?;
+        let res_heat_range_ = ((data_rh_ >> BME680_4_BIT_SHIFT) & BME680_2_BIT_MASK) as f64;
+        let res_heat_val_ = (i2cio::read_byte(i2c, BME680_REG_CALIB_RES_HEAT_VAL)? as i8) as f64;
+        let data_rse_ = i2cio::read_byte(i2c, BME680_REG_RANGE_SWITCHING_ERROR)?;
+        let range_sw_err_ = ((data_rse_  >> BME680_4_BIT_SHIFT) as i8) as f64;
+        debug!("Read {par_gh1_} {par_gh2_} {par_gh3_} {res_heat_range_} {res_heat_val_} {range_sw_err_}");
+
+        
         // -- return structured calibration data
         Ok(CalibData {
             par_t1, par_t2, par_t3,
             par_p1, par_p2, par_p3, par_p4, par_p5, 
             par_p6, par_p7, par_p8, par_p9, par_p10,
-            par_g1, par_g2, par_g3, res_heat_range, 
-            res_heat_val, range_switching_error,
+            par_gh1, par_gh2, par_gh3, res_heat_range, 
+            res_heat_val, range_sw_err,
             par_h1, par_h2, par_h3, par_h4, par_h5, 
             par_h6, par_h7,
         })
     }
 
-    pub fn get_meas_status(&mut self) -> Result<Bme280MeasuringStatus, std::io::Error> {
-        const REG: u8 = BME280_REG_MEAS_STATUS_0;
+    pub fn get_meas_status(&mut self) -> Result<Bme680MeasuringStatus, std::io::Error> {
+        const REG: u8 = BME680_REG_MEAS_STATUS_0;
         // -- read current value
         let reg_val = i2cio::read_byte(&mut self.i2c, REG)?;
         // -- extract status values
@@ -480,14 +639,14 @@ impl BME680 {
         let gas_measuring = (reg_val & BME680_MEAS_STATUS_0_GAS_MEASURING_BIT) > 0;
         let measuring = (reg_val & BME680_MEAS_STATUS_0_MEASURING_BIT) > 0;
         let gas_meas_index = reg_val & BME680_MEAS_STATUS_0_GAS_MEAS_INDEX_MASK;
-        Ok(Bme280MeasuringStatus {
+        Ok(Bme680MeasuringStatus {
             new_data, gas_measuring, measuring, gas_meas_index,
         })
     }
 
-    pub fn get_meas_result(&mut self) -> Result<Bme280MeasuringResult, std::io::Error> {
-        const REG: u8 = BME280_REG_MEAS_RESULT_BASE;
-        const LEN: usize = BME280_MEAS_RESULT_LEN;
+    pub fn get_meas_result(&mut self) -> Result<Bme680MeasuringResult, std::io::Error> {
+        const REG: u8 = BME680_REG_MEAS_RESULT_BASE;
+        const LEN: usize = BME680_MEAS_RESULT_LEN;
         let mut reg_data: [u8; LEN] = [0; LEN];
         // -- read current value and mask out run gas bit
         let _bytes_read = self.i2c.i2c_read_block_data(REG, &mut reg_data)?;
@@ -507,24 +666,23 @@ impl BME680 {
         let data_lsb = reg_data[7] as u16;
         let humidity_raw = data_msb | data_lsb;
 
-        Ok(Bme280MeasuringResult {
+        Ok(Bme680MeasuringResult {
             pressure_raw, temperature_raw, humidity_raw
         })
     }
 
-
-    pub fn get_gas_meas_result(&mut self) -> Result<Bme280GasMeasuringResult, std::io::Error> {
+    pub fn get_gas_meas_result(&mut self) -> Result<Bme680GasMeasuringResult, std::io::Error> {
         // -- read current value
-        let data_msb = i2cio::read_byte(&mut self.i2c, BME280_REG_GAS_ACD_MSB)?;
-        let data_lsb = i2cio::read_byte(&mut self.i2c, BME280_REG_GAS_ACD_LSB_RANGE)?;
+        let data_msb = i2cio::read_byte(&mut self.i2c, BME680_REG_GAS_ACD_MSB)?;
+        let data_lsb = i2cio::read_byte(&mut self.i2c, BME680_REG_GAS_ACD_LSB_RANGE)?;
         let gas_adc = ((data_msb << BME680_2_BIT_SHIFT) | (data_lsb >> BME680_6_BIT_SHIFT)) as f64;
         let gas_range = (data_lsb & BME680_4_BIT_MASK) as usize;
         let gas_valid = (data_lsb & BME680_GAS_VALID_BIT) > 0;
         let heat_stab = (data_lsb & BME680_HEAT_STAB_BIT) > 0;
-        let range_switching_error = self.calib_data.range_switching_error;
+        let range_switching_error = self.calib_data.range_sw_err;
         let var1 = (1340.0 + (5.0 * range_switching_error)) * GAS_RANGE_C1[gas_range];
         let gas_res = var1 * GAS_RANGE_C2[gas_range] / (gas_adc - 512.0 + var1);
-        let result = Bme280GasMeasuringResult {
+        let result = Bme680GasMeasuringResult {
             gas_res, gas_valid, heat_stab,
         };
         Ok(result)
@@ -600,7 +758,7 @@ impl BME680 {
     }
 
     pub fn set_forced_mode(&mut self) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_CTRL_MEAS;
+        const REG: u8 = BME680_REG_CTRL_MEAS;
         // -- read current value, set forced mode bit
         let reg_val = i2cio::read_byte(&mut self.i2c, REG)?;
         let reg_val = reg_val | BME680_CTRL_MEAS_FORCED_MODE_BIT;
@@ -610,7 +768,7 @@ impl BME680 {
     }
 
     pub fn set_humidity_osr(&mut self, humidity_osr: Bme680OverSampling) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_CTRL_HUM;
+        const REG: u8 = BME680_REG_CTRL_HUM;
         // -- set oversampling rate for humidity
         debug!("Setting humidity oversampling rate");
         i2cio::write_byte(&mut self.i2c, REG, humidity_osr.value())
@@ -618,7 +776,7 @@ impl BME680 {
 
     pub fn set_pressure_and_temperature_osr(&mut self, pressure_osr: Bme680OverSampling,
         temperature_osr: Bme680OverSampling) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_CTRL_MEAS;
+        const REG: u8 = BME680_REG_CTRL_MEAS;
         // -- put bits for OSR in place, power mode implicit set to sleep (bit 0 and 1)
         let reg_val = temperature_osr.value() << BME680_CTRL_MEAS_TEMPERATURE_SHL
             | pressure_osr.value() <<  BME680_CTRL_MEAS_PRESSURE_SHL;
@@ -628,7 +786,7 @@ impl BME680 {
     }
 
     pub fn set_irr_filter(&mut self, irr_filter: Bme680IrrFilter) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_CONFIG;
+        const REG: u8 = BME680_REG_CONFIG;
         let reg_val:u8 = irr_filter.value() <<  BME680_CONTROL_IIR_FILTER_SHL;
         // -- set infinite impulse response (IIR) filter
         debug!("Setting IRR filter");
@@ -636,7 +794,7 @@ impl BME680 {
     }
 
     pub fn enable_heater(&mut self) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_CTRL_GAS_0;
+        const REG: u8 = BME680_REG_CTRL_GAS_0;
         // -- read current value, set heater bit
         let reg_val = i2cio::read_byte(&mut self.i2c, REG)?;
         let reg_val = reg_val | BME680_CTRL_GAS_0_HEATER_SHL;
@@ -646,7 +804,7 @@ impl BME680 {
     }
 
     pub fn disable_heater(&mut self) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_CTRL_GAS_0;
+        const REG: u8 = BME680_REG_CTRL_GAS_0;
         // -- read current value, mask out heater bit
         let reg_val = i2cio::read_byte(&mut self.i2c, REG)?;
         let reg_val = reg_val & BME680_CTRL_GAS_0_HEATER_MASK;
@@ -656,7 +814,7 @@ impl BME680 {
     }
 
     pub fn set_heater_profile(&mut self, heater_profile: Bme680HeaterProfile) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_CTRL_GAS_1;
+        const REG: u8 = BME680_REG_CTRL_GAS_1;
         // -- read current value, mask out nb conv bits and set requested bits
         let reg_val = i2cio::read_byte(&mut self.i2c, REG)?;
         let reg_val = reg_val & BME680_NB_CONV_NB_CONV_MASK;
@@ -667,7 +825,7 @@ impl BME680 {
     }
 
     pub fn enable_run_gas(&mut self) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_CTRL_GAS_1;
+        const REG: u8 = BME680_REG_CTRL_GAS_1;
         // -- read current value and set run gas bit
         let reg_val = i2cio::read_byte(&mut self.i2c, REG)?;
         let reg_val = reg_val | (1 <<  BME680_NB_CONV_RUN_GAS_SHL);
@@ -677,7 +835,7 @@ impl BME680 {
     }
 
     pub fn disable_run_gas(&mut self) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_CTRL_GAS_1;
+        const REG: u8 = BME680_REG_CTRL_GAS_1;
         // -- read current value and mask out run gas bit
         let reg_val = i2cio::read_byte(&mut self.i2c, REG)?;
         let reg_val = reg_val & BME680_NB_CONV_RUN_GAS_MASK;
@@ -688,94 +846,94 @@ impl BME680 {
 
 
     pub fn calc_res_heat(&self, amb_temp: f64, target_temp: f64) -> u8 {
-        let var1 = ((self.calib_data.par_g1 as f64) / 16.0) + 49.0;
-        let var2 = (((self.calib_data.par_g2 as f64) / 32768.0) * 0.0005) + 0.00235;
-        let var3 = (self.calib_data.par_g3 as f64)  / 1024.0;
+        let var1 = ((self.calib_data.par_gh1 as f64) / 16.0) + 49.0;
+        let var2 = (((self.calib_data.par_gh2 as f64) / 32768.0) * 0.0005) + 0.00235;
+        let var3 = (self.calib_data.par_gh3 as f64)  / 1024.0;
         let var4 = var1 * (1.0 + (var2 * target_temp));
         let var5 = var4 + (var3 * amb_temp);
-        let res_heat_x = (3.4 * ((var5 * (4.0 / (4.0 + (self.calib_data.res_heat_range as f64))) * (1.0/(1.0 +
-        ((self.calib_data.res_heat_val as f64) * 0.002)))) - 25.0)) as u8;
-        res_heat_x
+        let res_heat = (3.4 * ((var5 * (4.0 / (4.0 + self.calib_data.res_heat_range)) * (1.0/(1.0 +
+        (self.calib_data.res_heat_val * 0.002)))) - 25.0)) as u8;
+        res_heat
     }
 
     // pub fn get_ldac_heat(&mut self) -> Result<Vec<u8>, std::io::Error> {
-    //     const REG: u8 = BME280_REG_IDAC_HEAT_BASE;
-    //     let mut reg_data: [u8; BME280_IDAC_HEAT_BASE_LEN] = [0; BME280_IDAC_HEAT_BASE_LEN];
+    //     const REG: u8 = BME680_REG_IDAC_HEAT_BASE;
+    //     let mut reg_data: [u8; BME680_IDAC_HEAT_BASE_LEN] = [0; BME680_IDAC_HEAT_BASE_LEN];
     //     // -- read current value and mask out run gas bit
     //     let reg_val = self.i2c.i2c_read_block_data(REG, &mut reg_data)?;
     //     Ok(Vec::from(reg_data))
     // }
 
     pub fn get_res_heat(&mut self) -> Result<Vec<u8>, std::io::Error> {
-        const REG: u8 = BME280_REG_RES_HEAT_BASE;
-        let mut reg_data: [u8; BME280_RES_HEAT_BASE_LEN] = [0; BME280_RES_HEAT_BASE_LEN];
+        const REG: u8 = BME680_REG_RES_HEAT_BASE;
+        let mut reg_data: [u8; BME680_RES_HEAT_BASE_LEN] = [0; BME680_RES_HEAT_BASE_LEN];
         // -- read current value and mask out run gas bit
         let _bytes_read = self.i2c.i2c_read_block_data(REG, &mut reg_data)?;
         Ok(Vec::from(reg_data))
     }
 
     fn set_res_heat(&mut self, reg: u8, res_heat: u8) -> Result<(), std::io::Error> {
-        if reg < BME280_REG_RES_HEAT_BASE || reg > BME280_REG_RES_HEAT_BASE + (BME280_RES_HEAT_BASE_LEN as u8) {
+        if reg < BME680_REG_RES_HEAT_BASE || reg > BME680_REG_RES_HEAT_BASE + (BME680_RES_HEAT_BASE_LEN as u8) {
             return Err(std::io::Error::other(format!("Invalid register for gas wait: {reg:#04x}")))
         }
         // -- write back register value
-        debug!("Setting heater resistance {} to {res_heat:#010b}", reg - BME280_REG_RES_HEAT_BASE);
+        debug!("Setting heater resistance {} to {res_heat:#010b}", reg - BME680_REG_RES_HEAT_BASE);
         i2cio::write_byte(&mut self.i2c, reg, res_heat)
     }
 
     pub fn set_res_heat_0(&mut self, res_heat: u8) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_RES_HEAT_BASE;
+        const REG: u8 = BME680_REG_RES_HEAT_BASE;
         self.set_res_heat(REG, res_heat)
     }
 
     pub fn set_res_heat_1(&mut self, res_heat: u8) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_RES_HEAT_BASE + 1;
+        const REG: u8 = BME680_REG_RES_HEAT_BASE + 1;
         self.set_res_heat(REG, res_heat)
     }
 
     pub fn set_res_heat_2(&mut self, res_heat: u8) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_RES_HEAT_BASE + 2;
+        const REG: u8 = BME680_REG_RES_HEAT_BASE + 2;
         self.set_res_heat(REG, res_heat)
     }
 
     pub fn set_res_heat_3(&mut self, res_heat: u8) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_RES_HEAT_BASE + 3;
+        const REG: u8 = BME680_REG_RES_HEAT_BASE + 3;
         self.set_res_heat(REG, res_heat)
     }
 
     pub fn set_res_heat_4(&mut self, res_heat: u8) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_RES_HEAT_BASE + 4;
+        const REG: u8 = BME680_REG_RES_HEAT_BASE + 4;
         self.set_res_heat(REG, res_heat)
     }
 
     pub fn set_res_heat_5(&mut self, res_heat: u8) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_RES_HEAT_BASE + 5;
+        const REG: u8 = BME680_REG_RES_HEAT_BASE + 5;
         self.set_res_heat(REG, res_heat)
     }
 
     pub fn set_res_heat_6(&mut self, res_heat: u8) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_RES_HEAT_BASE + 6;
+        const REG: u8 = BME680_REG_RES_HEAT_BASE + 6;
         self.set_res_heat(REG, res_heat)
     }
 
     pub fn set_res_heat_7(&mut self, res_heat: u8) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_RES_HEAT_BASE + 7;
+        const REG: u8 = BME680_REG_RES_HEAT_BASE + 7;
         self.set_res_heat(REG, res_heat)
     }
 
     pub fn set_res_heat_8(&mut self, res_heat: u8) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_RES_HEAT_BASE + 8;
+        const REG: u8 = BME680_REG_RES_HEAT_BASE + 8;
         self.set_res_heat(REG, res_heat)
     }
 
     pub fn set_res_heat_9(&mut self, res_heat: u8) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_RES_HEAT_BASE + 9;
+        const REG: u8 = BME680_REG_RES_HEAT_BASE + 9;
         self.set_res_heat(REG, res_heat)
     }
 
     pub fn get_gas_wait(&mut self) -> Result<Vec<u8>, std::io::Error> {
-        const REG: u8 = BME280_REG_GAS_WAIT_BASE;
-        let mut reg_data: [u8; BME280_GAS_WAIT_BASE_LEN] = [0; BME280_GAS_WAIT_BASE_LEN];
+        const REG: u8 = BME680_REG_GAS_WAIT_BASE;
+        let mut reg_data: [u8; BME680_GAS_WAIT_BASE_LEN] = [0; BME680_GAS_WAIT_BASE_LEN];
         // -- read current value and mask out run gas bit
         let _bytes_read = self.i2c.i2c_read_block_data(REG, &mut reg_data)?;
         Ok(Vec::from(reg_data))
@@ -789,61 +947,61 @@ impl BME680 {
         };
         let mult_fact = mult_fact.value();
         let reg_val = mult_fact << BME680_GAS_WAIT_MULT_FACT_SHL | milli_secs;
-        if reg < BME280_REG_GAS_WAIT_BASE || reg > BME280_REG_GAS_WAIT_BASE + (BME280_GAS_WAIT_BASE_LEN as u8) {
+        if reg < BME680_REG_GAS_WAIT_BASE || reg > BME680_REG_GAS_WAIT_BASE + (BME680_GAS_WAIT_BASE_LEN as u8) {
             return Err(std::io::Error::other(format!("Invalid register for gas wait: {reg:#04x}")))
         }
         // -- write back register value
-        debug!("Setting gas wait {} to {reg_val:#010b} / {reg_val:#04x}", reg - BME280_REG_GAS_WAIT_BASE);
+        debug!("Setting gas wait {} to {reg_val:#010b} / {reg_val:#04x}", reg - BME680_REG_GAS_WAIT_BASE);
         i2cio::write_byte(&mut self.i2c, reg, reg_val)
     }
 
     pub fn set_gas_wait_0(&mut self, milli_secs: u8, mult_fact: Bme680GasWaitMultiplicationFactor) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_GAS_WAIT_BASE;
+        const REG: u8 = BME680_REG_GAS_WAIT_BASE;
         self.set_gas_wait(REG, milli_secs, mult_fact)
     }
 
     pub fn set_gas_wait_1(&mut self, milli_secs: u8, mult_fact: Bme680GasWaitMultiplicationFactor) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_GAS_WAIT_BASE + 1;
+        const REG: u8 = BME680_REG_GAS_WAIT_BASE + 1;
         self.set_gas_wait(REG, milli_secs, mult_fact)
     }
 
     pub fn set_gas_wait_2(&mut self, milli_secs: u8, mult_fact: Bme680GasWaitMultiplicationFactor) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_GAS_WAIT_BASE + 2;
+        const REG: u8 = BME680_REG_GAS_WAIT_BASE + 2;
         self.set_gas_wait(REG, milli_secs, mult_fact)
     }
 
     pub fn set_gas_wait_3(&mut self, milli_secs: u8, mult_fact: Bme680GasWaitMultiplicationFactor) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_GAS_WAIT_BASE + 3;
+        const REG: u8 = BME680_REG_GAS_WAIT_BASE + 3;
         self.set_gas_wait(REG, milli_secs, mult_fact)
     }
 
     pub fn set_gas_wait_4(&mut self, milli_secs: u8, mult_fact: Bme680GasWaitMultiplicationFactor) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_GAS_WAIT_BASE + 4;
+        const REG: u8 = BME680_REG_GAS_WAIT_BASE + 4;
         self.set_gas_wait(REG, milli_secs, mult_fact)
     }
 
     pub fn set_gas_wait_5(&mut self, milli_secs: u8, mult_fact: Bme680GasWaitMultiplicationFactor) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_GAS_WAIT_BASE + 5;
+        const REG: u8 = BME680_REG_GAS_WAIT_BASE + 5;
         self.set_gas_wait(REG, milli_secs, mult_fact)
     }
 
     pub fn set_gas_wait_6(&mut self, milli_secs: u8, mult_fact: Bme680GasWaitMultiplicationFactor) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_GAS_WAIT_BASE + 6;
+        const REG: u8 = BME680_REG_GAS_WAIT_BASE + 6;
         self.set_gas_wait(REG, milli_secs, mult_fact)
     }
 
     pub fn set_gas_wait_7(&mut self, milli_secs: u8, mult_fact: Bme680GasWaitMultiplicationFactor) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_GAS_WAIT_BASE + 7;
+        const REG: u8 = BME680_REG_GAS_WAIT_BASE + 7;
         self.set_gas_wait(REG, milli_secs, mult_fact)
     }
 
     pub fn set_gas_wait_8(&mut self, milli_secs: u8, mult_fact: Bme680GasWaitMultiplicationFactor) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_GAS_WAIT_BASE + 8;
+        const REG: u8 = BME680_REG_GAS_WAIT_BASE + 8;
         self.set_gas_wait(REG, milli_secs, mult_fact)
     }
 
     pub fn set_gas_wait_9(&mut self, milli_secs: u8, mult_fact: Bme680GasWaitMultiplicationFactor) -> Result<(), std::io::Error> {
-        const REG: u8 = BME280_REG_GAS_WAIT_BASE + 9;
+        const REG: u8 = BME680_REG_GAS_WAIT_BASE + 9;
         self.set_gas_wait(REG, milli_secs, mult_fact)
     }
 
