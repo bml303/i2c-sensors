@@ -1,12 +1,12 @@
 use chrono::Local;
 use clap::Parser;
 use log::{error, info};
-use std::collections::VecDeque;
 use std::path::Path;
 use std::process::ExitCode;
 use std::{thread, time};
 
 use i2c_sensors::bme680::*;
+use i2c_sensors::voc_algo::VocAlgorithmParams;
 
 const EXIT_CODE_SET_CTR_C_HNDLR_FAILED: u8 = 0x02;
 const EXIT_CODE_BME680_INIT_FAILED: u8 = 0x71;
@@ -23,25 +23,6 @@ const EXIT_CODE_BME680_GET_GAS_MEASURING_RESULT_FAILED: u8 = 0x79;
 struct Args {
     // -- i2c bus device
     bus_path: String,
-}
-
-// -- curtesy of https://github.com/thstielow/raspi-bme680-iaq/blob/main/bme680IAQ.py
-// -- calculates the saturation water density of air at the current temperature (in °C)
-// -- return the saturation density rho_max in kg/m^3
-// -- this is equal to a relative humidity of 100% at the current temperature 
-fn water_sat_density(temperature: f64) -> f64 {
-    let exp = (17.62 * temperature)/(243.12 + temperature).exp();
-    let rho_max = (6.112 * 100.0 * exp)/(461.52 * (temperature + 273.15));
-    rho_max
-}
-
-fn calc_mean(data: &VecDeque<f64>) -> f64 {
-    let data_iter = data.iter();
-    let mut sum = 0.0;
-    for val in data_iter {
-        sum += val;
-    }
-    sum / data.len() as f64
 }
 
 fn main() -> ExitCode {
@@ -83,18 +64,11 @@ fn main() -> ExitCode {
     };
     let chip_id = bme680.get_chip_id();
     info!("Got chip id {chip_id:#04x}");    
+            
+    const MEASURING_DELAY_SEC: u64 = 1;    
+    let mut ambient_temperature = 20.0;
     
-    // -- assume ambient temperature for first run, then use measured value
-    const BURN_IN_CYCLES: u64 = 360;
-    const BURN_IN_DELAY_SEC: u64 = 1;
-    const MEASURING_DELAY_SEC: u64 = 5;
-    const PH_SLOPE: f64 = 0.01;
-    let mut ambient_temp = 20.0;
-    let mut burn_in_cycles = BURN_IN_CYCLES;
-    let mut gas_cal_data: VecDeque<f64> = VecDeque::new();
-    let mut gas_ceil = 0.0;
-    const GAS_RECAL_PERIOD: usize = 360; // / MEASURING_DELAY_SEC as usize;
-    let mut gas_recal_step: usize = 0;
+    let mut voc_algo = VocAlgorithmParams::new();
 
     loop {
 
@@ -104,7 +78,7 @@ fn main() -> ExitCode {
         }
     
         const TARGET_TEMP: f64 = 320.0;
-        let res_heat = bme680.calc_res_heat(ambient_temp, TARGET_TEMP);
+        let res_heat = bme680.calc_res_heat(ambient_temperature, TARGET_TEMP);
     
         if let Err(err) = bme680.set_res_heat_0(res_heat) {
             error!("ERROR - BME680 failed to set res heat: {err}");
@@ -171,70 +145,17 @@ fn main() -> ExitCode {
             } 
         };
         info!("Got gas resistance {gas_result:#?}");
+        if gas_result.gas_valid && gas_result.heat_stab {
+            // -- it's a stretch: 
+            // -- using a scaling factor to get a voc raw value usable for the VOC algo
+            let voc_raw = (gas_result.gas_res * 1.5) as u16;            
+            let voc_index = voc_algo.process(voc_raw);
+            info!("voc_raw: {voc_raw}, voc_index: {voc_index}");
+        }        
 
         // -- store ambient temperature for next loop
-        ambient_temp = temperature;
-        if !(gas_result.gas_valid && gas_result.heat_stab) {
-            // -- skip measurement if not valid or heater not stable (or both)
-            let measuring_delay = time::Duration::from_millis(MEASURING_DELAY_SEC * 1000);
-            thread::sleep(measuring_delay);
-            continue
-        }
-
-        // -- get saturation water density of air
-        let rho_max = water_sat_density(temperature);
-        // -- absolute humidity
-        let hum_abs = humidity * 10.0 * rho_max;
-        // -- compensate exponential impact of humidity on resistance
-		let comp_gas = gas_result.gas_res * (PH_SLOPE * hum_abs).exp();
-        // -- burn-in or not 
-        if burn_in_cycles > 0 {
-            burn_in_cycles -= 1;
-            if comp_gas > gas_ceil {
-                //gas_cal_data.clear();   
-                gas_cal_data.push_back(comp_gas);
-                while gas_cal_data.len() > 5 {
-                    gas_cal_data.pop_front();
-                }
-                gas_ceil = comp_gas;
-            }
-            info!("Burn-in cycle {burn_in_cycles}: gas_ceil {gas_ceil}");
-            // -- delay next measuring
-            let measuring_delay = time::Duration::from_millis(BURN_IN_DELAY_SEC * 1000);
-            thread::sleep(measuring_delay);
-            continue
-        } else {
-            // -- adapt calibration
-			if comp_gas > gas_ceil {
-				gas_cal_data.push_back(comp_gas);
-				while gas_cal_data.len() > 50 {
-                    gas_cal_data.pop_front();
-                }
-                gas_ceil = calc_mean(&gas_cal_data);
-            }
-
-            // -- calculate and print relative air quality on a scale of 0-100%
-            let aqr = comp_gas / gas_ceil;
-            // -- clip air quality at 100%
-            let aq = aqr.min(1.0) * 100.0;
-            // -- use quadratic ratio for steeper scaling at high air quality
-			//let aq = (aqr.powi(2)).min(1.0) * 100.0;
-            let aqi = (1.0 - (aq / 100.0)) * 500.0;
-            info!("AQR {aqr}, Air Quality Index {aqi}, AQ {aq}%, comp_gas {comp_gas}");
-
-            // -- for compensating negative drift (dropping resistance) of the gas sensor:
-			// -- delete oldest value from calibration list and add current value
-			gas_recal_step += 1;
-			if gas_recal_step >= GAS_RECAL_PERIOD {
-                gas_recal_step = 0;
-				gas_cal_data.push_back(comp_gas);
-                while gas_cal_data.len() > 50 {
-                    gas_cal_data.pop_front();
-                }
-                gas_ceil = calc_mean(&gas_cal_data);
-            }
-        }
-
+        ambient_temperature = temperature;
+        
         // -- delay next measuring
         let measuring_delay = time::Duration::from_millis(MEASURING_DELAY_SEC * 1000);
         thread::sleep(measuring_delay);

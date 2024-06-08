@@ -11,6 +11,7 @@ use i2c_sensors::sht31::{
     SHT31SingleShotAcquisitionNoClockStretch, 
     SHT31ContinuousAcquisition,
 };
+use i2c_sensors::sgp40::SGP40;
 
 const EXIT_CODE_SET_CTR_C_HNDLR_FAILED: u8 = 0x02;
 const EXIT_CODE_UNSUPPORTED_MODE: u8 = 0x03;
@@ -55,6 +56,16 @@ fn main() -> ExitCode {
         error!("ERROR - Failed to set Ctrl-C handler: {err}");
         return ExitCode::from(EXIT_CODE_SET_CTR_C_HNDLR_FAILED);
     }
+
+    info!("Initializing SGP40");
+    let bus_path = Path::new(&bus_path);    
+    let mut sgp40 = match SGP40::new(bus_path) {
+        Ok(sgp40) => sgp40,
+        Err(err) => {
+            error!("ERROR - Failed to initialize SGP40: {err}");
+            return ExitCode::from(EXIT_CODE_SHT31_INIT_FAILED);
+        }
+    };
 
     info!("Initializing SHT31");
     let bus_path = Path::new(&bus_path);
@@ -121,8 +132,13 @@ fn main() -> ExitCode {
         let temperature = sht31.get_temperature_celcius(temperature_raw);
         let humidity = sht31.get_humidity(humidity_raw);
         info!("temperature: {temperature}, humidity: {humidity}");
-        
-        let data_acquisition_delay = time::Duration::from_millis(2000);
+
+        if let Ok(voc_raw) = sgp40.get_voc_data_with_compensation(humidity_raw, temperature_raw) {
+            let voc_index = sgp40.process_voc(voc_raw);
+            info!("voc_raw: {voc_raw}, voc_index: {voc_index}");
+        };
+                
+        let data_acquisition_delay = time::Duration::from_millis(1000);
         thread::sleep(data_acquisition_delay);
     }
 }

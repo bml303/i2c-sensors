@@ -1,6 +1,9 @@
-use i2c_linux::I2c;
+use i2c_linux::{    
+    I2c, Message, ReadFlags, WriteFlags,
+};
 use std::fs::File;
 use std::path::Path;
+use std::{thread, time};
 
 pub fn get_bus(bus_path: &Path)  -> Result<I2c<File>, std::io::Error> {
     I2c::from_path(bus_path)
@@ -25,6 +28,12 @@ pub fn read_byte(i2c: &mut I2c<File>, register: u8) -> Result<u8, std::io::Error
     i2c.smbus_read_byte_data(register)
 }
 
+pub fn read_bytes(i2c: &mut I2c<File>, device_addr: u16, data: &mut [u8]) -> Result<(), std::io::Error> {
+    let read_message = Message::Read { address: device_addr, data: data, flags: ReadFlags::empty() };
+    let mut messages = [read_message];
+    i2c.i2c_transfer(&mut messages)
+}
+
 pub fn write_byte_single(i2c: &mut I2c<File>, data: u8) -> Result<(), std::io::Error> {
     i2c.smbus_write_byte(data)
 }
@@ -33,6 +42,19 @@ pub fn write_byte(i2c: &mut I2c<File>, register: u8, data: u8) -> Result<(), std
     i2c.smbus_write_byte_data(register, data)
 }
 
+pub fn write_bytes<const LEN: usize>(i2c: &mut I2c<File>, device_addr: u16, data: [u8; LEN]) -> Result<(), std::io::Error> {
+    let data = &data;
+    let write_message = Message::Write { address: device_addr, data: data, flags: WriteFlags::empty() };
+    let mut messages = [write_message];
+    i2c.i2c_transfer(&mut messages)
+}
+
 pub fn write_word(i2c: &mut I2c<File>, register: u8, data: u16) -> Result<(), std::io::Error> {
     i2c.smbus_write_word_data(register, data)
 }
+
+pub fn delay(milli_secs: u32) {    
+    let delay = time::Duration::from_millis(milli_secs as u64);
+    thread::sleep(delay);
+}
+
