@@ -135,23 +135,22 @@ pub struct DataRaw {
     pub temperature: u32,
 }
 
-
 pub struct BMP388 {
     // -- i2c bus
     i2c: I2c<File>,
     // -- device address.
-    device_addr: BMP388DeviceAddress,
+    device_addr: Bmp388DeviceAddress,
     // -- calibration data
     calib_data: CalibData,
     // -- is sensor time enabled for FIFO data?
-    with_sensor_time: BMP388FifoWithSensorTime,
+    with_sensor_time: Bmp388FifoWithSensorTime,
 }
 
 impl BMP388 {
 
-    pub fn new(i2c_bus_path: &Path, device_addr: BMP388DeviceAddress,
-        osr_p: BMP388OverSamplingPr, osr_t: BMP388OverSamplingTp,
-        irr_filter: BMP388IrrFilter, odr: BMP388OutputDataRate) -> Result<BMP388, std::io::Error> {
+    pub fn new(i2c_bus_path: &Path, device_addr: Bmp388DeviceAddress,
+        osr_p: Bmp388OverSamplingPr, osr_t: Bmp388OverSamplingTp,
+        irr_filter: Bmp388IrrFilter, odr: Bmp388OutputDataRate) -> Result<BMP388, std::io::Error> {
         // -- get the bus
         let mut i2c = i2cio::get_bus(i2c_bus_path)?;
         // -- set device address
@@ -172,7 +171,7 @@ impl BMP388 {
             i2c,
             device_addr,
             calib_data,
-            with_sensor_time: BMP388FifoWithSensorTime::Disabled,
+            with_sensor_time: Bmp388FifoWithSensorTime::Disabled,
         };
         bmp388.set_osr_pressure_temperature(osr_p, osr_t)?;
         bmp388.set_irr_filter(irr_filter)?;
@@ -181,7 +180,7 @@ impl BMP388 {
     }
 
     #[allow(dead_code)]
-    pub fn get_device_addr(&self) -> BMP388DeviceAddress {
+    pub fn get_device_addr(&self) -> Bmp388DeviceAddress {
         self.device_addr.clone()
     }
 
@@ -195,63 +194,63 @@ impl BMP388 {
         Ok(())
     }
 
-    pub fn set_output_data_rate(&mut self, subdiv_factor: BMP388OutputDataRate) -> Result<(), std::io::Error> {
+    pub fn set_output_data_rate(&mut self, subdiv_factor: Bmp388OutputDataRate) -> Result<(), std::io::Error> {
         let reg_val = subdiv_factor.value();
         debug!("Setting register BMP388_REG_OUTPUT_DATA_RATE {BMP388_REG_OUTPUT_DATA_RATE:#x} to value {reg_val:#010b}");
         // -- write it back
         i2cio::write_byte(&mut self.i2c, BMP388_REG_OUTPUT_DATA_RATE, reg_val)
     }
 
-    pub fn set_irr_filter(&mut self, irr_filter: BMP388IrrFilter) -> Result<(), std::io::Error> {
+    pub fn set_irr_filter(&mut self, irr_filter: Bmp388IrrFilter) -> Result<(), std::io::Error> {
         let reg_val = irr_filter.value();
         debug!("Setting register BMP388_REG_CONFIG {BMP388_REG_CONFIG:#x} to value {reg_val:#010b}");
         // -- write it back
         i2cio::write_byte(&mut self.i2c, BMP388_REG_CONFIG, reg_val)
     }
 
-    pub fn set_sensor_mode(&mut self, pwr_mode : BMP388SensorPowerMode,
-        enable_pressure: BMP388StatusPressureSensor, enable_temperature: BMP388StatusTemperatureSensor) -> Result<(), std::io::Error> {
+    pub fn set_sensor_mode(&mut self, pwr_mode : Bmp388SensorPowerMode,
+        enable_pressure: Bmp388StatusPressureSensor, enable_temperature: Bmp388StatusTemperatureSensor) -> Result<(), std::io::Error> {
         let reg_val = pwr_mode.value() << BMP388_POWER_MODE_LOW_BIT | enable_temperature.value() << 1 | enable_pressure.value();
         debug!("Setting register BMP388_REG_POWER_CONTROL {BMP388_REG_POWER_CONTROL:#x} to value {reg_val:#010b}");
         // -- write it back
         i2cio::write_byte(&mut self.i2c, BMP388_REG_POWER_CONTROL, reg_val)
     }
 
-    pub fn get_sensor_mode(&mut self) -> Result<(BMP388SensorPowerMode, BMP388StatusPressureSensor, BMP388StatusTemperatureSensor), std::io::Error> {
+    pub fn get_sensor_mode(&mut self) -> Result<(Bmp388SensorPowerMode, Bmp388StatusPressureSensor, Bmp388StatusTemperatureSensor), std::io::Error> {
         // -- read current value of BMP388_REG_POWER_CONTROL
         let reg_val = i2cio::read_byte(&mut self.i2c, BMP388_REG_POWER_CONTROL)?;
         debug!("Got register BMP388_REG_POWER_CONTROL {BMP388_REG_POWER_CONTROL:#x} value {reg_val:#010b}");
         let pressure_enabled = match (reg_val & BMP388_PRESSURE_SENSOR_ENABLED_BIT) > 0 {
-            false => BMP388StatusPressureSensor::Disabled,
-            true => BMP388StatusPressureSensor::Enabled,
+            false => Bmp388StatusPressureSensor::Disabled,
+            true => Bmp388StatusPressureSensor::Enabled,
         };
         let temperature_enabled = match (reg_val & BMP388_TEMPERATURE_SENSOR_ENABLED_BIT) > 0 {
-            false => BMP388StatusTemperatureSensor::Disabled,
-            true => BMP388StatusTemperatureSensor::Enabled,
+            false => Bmp388StatusTemperatureSensor::Disabled,
+            true => Bmp388StatusTemperatureSensor::Enabled,
         };
         let sensor_mode = match reg_val >> BMP388_POWER_MODE_LOW_BIT {
-            0 => BMP388SensorPowerMode::Sleep,
-            1..=2 => BMP388SensorPowerMode::Forced,
-            _ => BMP388SensorPowerMode::Normal,
+            0 => Bmp388SensorPowerMode::Sleep,
+            1..=2 => Bmp388SensorPowerMode::Forced,
+            _ => Bmp388SensorPowerMode::Normal,
         };
         Ok((sensor_mode, pressure_enabled, temperature_enabled))
     }
 
     pub fn get_status(&mut self)
-        -> Result<(BMP388StatusCommandDecoder, BMP388StatusPressureData, BMP388StatusTemperatureData), std::io::Error> {
+        -> Result<(Bmp388StatusCommandDecoder, Bmp388StatusPressureData, Bmp388StatusTemperatureData), std::io::Error> {
         // -- read current value of BMP388_REG_POWER_CONTROL
         let reg_val = i2cio::read_byte(&mut self.i2c, BMP388_REG_STATUS)?;
         let cmd_decoder_ready = match (reg_val & BMP388_STATUS_CMD_READY_MASK) > 0 {
-            false => BMP388StatusCommandDecoder::NotReady,
-            true => BMP388StatusCommandDecoder::Ready,
+            false => Bmp388StatusCommandDecoder::NotReady,
+            true => Bmp388StatusCommandDecoder::Ready,
         };
         let pressure_data_ready = match (reg_val & BMP388_STATUS_PRESSURE_DATA_READY_MASK) > 0 {
-            false => BMP388StatusPressureData::NotReady,
-            true => BMP388StatusPressureData::Ready,
+            false => Bmp388StatusPressureData::NotReady,
+            true => Bmp388StatusPressureData::Ready,
         };
         let temperature_data_ready = match (reg_val & BMP388_STATUS_TEMPERATURE_DATA_READY_MASK) > 0 {
-            false => BMP388StatusTemperatureData::NotReady,
-            true => BMP388StatusTemperatureData::Ready,
+            false => Bmp388StatusTemperatureData::NotReady,
+            true => Bmp388StatusTemperatureData::Ready,
         };
         Ok((cmd_decoder_ready, pressure_data_ready, temperature_data_ready))
     }
@@ -267,9 +266,9 @@ impl BMP388 {
         Ok(int_status & BMP388_INT_STATUS_DATA_READY_BIT > 0)
     }
 
-    pub fn enable_fifo(&mut self, stop_on_full: BMP388FifoStopOnFull,
-        with_pressure: BMP388FifoWithPressureData, with_temperature: BMP388FifoWithTemperatureData, 
-        with_sensor_time: BMP388FifoWithSensorTime, data_filtered: BMP388FifoDataFiltered, subsampling: i8) 
+    pub fn enable_fifo(&mut self, stop_on_full: Bmp388FifoStopOnFull,
+        with_pressure: Bmp388FifoWithPressureData, with_temperature: Bmp388FifoWithTemperatureData, 
+        with_sensor_time: Bmp388FifoWithSensorTime, data_filtered: Bmp388FifoDataFiltered, subsampling: i8) 
         -> Result<(), std::io::Error> {
         debug!("Enabling FIFO");
         // -- flush fifo on enable to get rid of old data
@@ -601,7 +600,7 @@ impl BMP388 {
         else if header & BMP388_FIFO_SENSOR_FRAME_BIT > 0 {
             let fifo_length = self.get_fifo_length()? as usize;
             if header & BMP388_FIFO_SENSOR_FRAME_TEMPERATURE_BIT > 0 && header & BMP388_FIFO_SENSOR_FRAME_PRESSURE_BIT > 0 {
-                if self.with_sensor_time == BMP388FifoWithSensorTime::Enabled 
+                if self.with_sensor_time == Bmp388FifoWithSensorTime::Enabled 
                     && fifo_length == BMP388_FIFO_FRAMLE_LENGTH_PRESSURE_TEMPERATURE {
                     let (pressure_raw, temperature_raw, sensor_time) = self.read_fifo_frame_pressure_temperature_with_time()?;
                     return Ok(FifoData {
@@ -614,7 +613,7 @@ impl BMP388 {
                     })
                 }
             } else if header & BMP388_FIFO_SENSOR_FRAME_TEMPERATURE_BIT > 0 {
-                if self.with_sensor_time == BMP388FifoWithSensorTime::Enabled
+                if self.with_sensor_time == Bmp388FifoWithSensorTime::Enabled
                     && fifo_length == BMP388_FIFO_FRAMLE_LENGTH_TEMPERATURE {
                     let (temperature_raw, sensor_time) = self.read_fifo_frame_temperature_with_time()?;
                     return Ok(FifoData {
@@ -627,7 +626,7 @@ impl BMP388 {
                     })
                 }
             } else if header & BMP388_FIFO_SENSOR_FRAME_PRESSURE_BIT > 0 {
-                if self.with_sensor_time == BMP388FifoWithSensorTime::Enabled 
+                if self.with_sensor_time == Bmp388FifoWithSensorTime::Enabled 
                     && fifo_length == BMP388_FIFO_FRAMLE_LENGTH_PRESSURE {
                     let (pressure_raw, sensor_time) = self.read_fifo_frame_pressure_with_time()?;
                     return Ok(FifoData {
@@ -756,7 +755,7 @@ impl BMP388 {
         Ok(temperature)
     }
 
-    pub fn set_osr_pressure_temperature(&mut self, osr_p: BMP388OverSamplingPr, osr_t : BMP388OverSamplingTp) -> Result<(), std::io::Error> {
+    pub fn set_osr_pressure_temperature(&mut self, osr_p: Bmp388OverSamplingPr, osr_t : Bmp388OverSamplingTp) -> Result<(), std::io::Error> {
         // -- write oversampling for pressure and temperature
         let reg_val = osr_t.value() << 3 | osr_p.value();
         debug!("Setting register BMP388_REG_OVERSAMPLING_RATE {BMP388_REG_OVERSAMPLING_RATE:#x} to value {reg_val:#010b} / {osr_p} for pressure, {osr_t} for temperature");

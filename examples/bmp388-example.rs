@@ -34,15 +34,15 @@ struct Args {
     mode: AcquisitionMode,
 }
 
-fn get_sensor_settings(mode: &AcquisitionMode) -> (BMP388OverSamplingPr, BMP388OverSamplingTp,
-    BMP388IrrFilter, BMP388OutputDataRate) {
+fn get_sensor_settings(mode: &AcquisitionMode) -> (Bmp388OverSamplingPr, Bmp388OverSamplingTp,
+    Bmp388IrrFilter, Bmp388OutputDataRate) {
     match mode {
-        AcquisitionMode::Forced => (BMP388OverSamplingPr::UltraLowX1, BMP388OverSamplingTp::X1,
-            BMP388IrrFilter::Off, BMP388OutputDataRate::Ix0_78Hz),
-        AcquisitionMode::Normal => (BMP388OverSamplingPr::HighX8, BMP388OverSamplingTp::X1,
-            BMP388IrrFilter::Coef1, BMP388OutputDataRate::Ix0_78Hz),
-        AcquisitionMode::Fifo => (BMP388OverSamplingPr::HighX8, BMP388OverSamplingTp::X1,
-            BMP388IrrFilter::Coef1, BMP388OutputDataRate::Ix0_78Hz),
+        AcquisitionMode::Forced => (Bmp388OverSamplingPr::UltraLowX1, Bmp388OverSamplingTp::X1,
+            Bmp388IrrFilter::Off, Bmp388OutputDataRate::Ix0_78Hz),
+        AcquisitionMode::Normal => (Bmp388OverSamplingPr::HighX8, Bmp388OverSamplingTp::X1,
+            Bmp388IrrFilter::Coef1, Bmp388OutputDataRate::Ix0_78Hz),
+        AcquisitionMode::Fifo => (Bmp388OverSamplingPr::HighX8, Bmp388OverSamplingTp::X1,
+            Bmp388IrrFilter::Coef1, Bmp388OutputDataRate::Ix0_78Hz),
     }
 
 }
@@ -72,7 +72,7 @@ fn main() -> ExitCode {
 
     info!("Initializing BMP388");
     let bus_path = Path::new(&bus_path);
-    let dev_addr = BMP388DeviceAddress::Default;
+    let dev_addr = Bmp388DeviceAddress::Default;
     let (osr_p, osr_t, irr_filter, odr) = get_sensor_settings(&args.mode);
     let mut bmp388 = match BMP388::new(bus_path, dev_addr, osr_p, osr_t, irr_filter, odr) {
         Ok(bmp388) => bmp388,
@@ -82,21 +82,21 @@ fn main() -> ExitCode {
         }
     };
     // -- start reading data
-    let enable_pressure = BMP388StatusPressureSensor::Enabled;
-    let enable_temperature = BMP388StatusTemperatureSensor::Enabled;
+    let enable_pressure = Bmp388StatusPressureSensor::Enabled;
+    let enable_temperature = Bmp388StatusTemperatureSensor::Enabled;
     if args.mode == AcquisitionMode::Normal || args.mode == AcquisitionMode::Fifo {
         info!("Setting normal mode");
-        if let Err(err) = bmp388.set_sensor_mode(BMP388SensorPowerMode::Normal, enable_pressure, enable_temperature) {
+        if let Err(err) = bmp388.set_sensor_mode(Bmp388SensorPowerMode::Normal, enable_pressure, enable_temperature) {
             error!("ERROR - Failed to set BMP388 to normal power mode: {err}");
             return ExitCode::from(EXIT_CODE_BMP388_SET_NORMAL_POWER_MODE_FAILED);
         }
         if args.mode == AcquisitionMode::Fifo {
             // -- enable fifo
-            let stop_on_full = BMP388FifoStopOnFull::Enabled;
-            let with_pressure = BMP388FifoWithPressureData::Enabled;
-            let with_temperature = BMP388FifoWithTemperatureData::Enabled;
-            let with_sensor_time = BMP388FifoWithSensorTime::Enabled;
-            let data_filtered = BMP388FifoDataFiltered::Filtered;
+            let stop_on_full = Bmp388FifoStopOnFull::Enabled;
+            let with_pressure = Bmp388FifoWithPressureData::Enabled;
+            let with_temperature = Bmp388FifoWithTemperatureData::Enabled;
+            let with_sensor_time = Bmp388FifoWithSensorTime::Enabled;
+            let data_filtered = Bmp388FifoDataFiltered::Filtered;
             let subsampling = 0;
             if let Err(err) = bmp388.enable_fifo(stop_on_full, with_pressure, with_temperature, with_sensor_time, data_filtered, subsampling) {
                 error!("ERROR - Failed to enable BMP388 FIFO: {err}");
@@ -108,7 +108,7 @@ fn main() -> ExitCode {
     loop {
         if args.mode == AcquisitionMode::Forced {
             info!("Setting forced mode");
-            if let Err(err) = bmp388.set_sensor_mode(BMP388SensorPowerMode::Forced, BMP388StatusPressureSensor::Enabled, BMP388StatusTemperatureSensor::Enabled) {
+            if let Err(err) = bmp388.set_sensor_mode(Bmp388SensorPowerMode::Forced, Bmp388StatusPressureSensor::Enabled, Bmp388StatusTemperatureSensor::Enabled) {
                 error!("ERROR - Failed to set BMP388 to forced power mode: {err}");
                 return ExitCode::from(EXIT_CODE_BMP388_SET_FORCED_POWER_MODE_FAILED);
             }
@@ -125,7 +125,7 @@ fn main() -> ExitCode {
                         }
                     };
                     info!("Got mode '{power_mode}', '{p_enabled}', '{t_enabled}'");
-                    if power_mode == BMP388SensorPowerMode::Sleep {
+                    if power_mode == Bmp388SensorPowerMode::Sleep {
                         info!("Getting data after forced mode");
                         break;
                     }
@@ -139,7 +139,7 @@ fn main() -> ExitCode {
                         }
                     };
                     info!("Got status '{cmd_dec_rdy}', '{p_data_rdy}', '{t_data_rdy}'");
-                    if p_data_rdy == BMP388StatusPressureData::Ready && t_data_rdy == BMP388StatusTemperatureData::Ready {
+                    if p_data_rdy == Bmp388StatusPressureData::Ready && t_data_rdy == Bmp388StatusTemperatureData::Ready {
                         info!("Getting data in normal mode");
                         break;
                     }
